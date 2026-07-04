@@ -9,7 +9,7 @@ const CompanyProfileSchema = new mongoose.Schema(
     nsc: { type: String, required: true, trim: true },
     gstHst: { type: String, required: true, trim: true },
     qst: { type: String, trim: true },
-    ifta: { type: String, required: true, trim: true },
+    // ifta: { type: String, required: true, trim: true },
     email: { type: String, required: true, trim: true, lowercase: true },
     phone: { type: String, required: true, trim: true },
     countryCode: { type: String, required: true, default: "+1" },

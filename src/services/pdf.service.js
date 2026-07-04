@@ -26,6 +26,13 @@ const generateInvoicePDF = async (invoice) => {
     });
   };
 
+  // Mask GST/HST number to show only last 6 digits
+  const maskGstNumber = (gstNumber) => {
+    if (!gstNumber || gstNumber.length <= 6) return gstNumber || "N/A";
+    const lastSix = gstNumber.slice(-6);
+    return `******${lastSix}`;
+  };
+
   // 🔄 Dynamic Multi/Single Header Tracker Engine Rule
   const tripsCount = invoice.trips?.length || 0;
   const dynamicInvoiceTitle = tripsCount > 1 ? "INVOICE - T" : "INVOICE - 1";
@@ -37,6 +44,7 @@ const generateInvoicePDF = async (invoice) => {
       <td style="padding: 14px 12px; font-size: 12px; text-align: center;">${index + 1}</td>
       <td style="padding: 14px 12px; font-size: 12px; white-space: nowrap;">${formatDate(trip.tripDate)}</td>
       <td style="padding: 14px 12px; font-size: 12px; font-weight: bold; color: #1e293b;">${trip.vrid || "N/A"}</td>
+      <td style="padding: 14px 12px; font-size: 12px; font-weight: 600; color: #2563eb;">${trip.driverName || "N/A"}</td>
       <td style="padding: 14px 12px; font-size: 12px;">${trip.route || "N/A"}</td>
       <td style="padding: 14px 12px; font-size: 12px;">${trip.pickup || "N/A"} to ${trip.drop || "N/A"}</td>
       <td style="padding: 14px 12px; font-size: 12px; text-align: right;">${formatCurrency(trip.totalCharges)}</td>
@@ -73,9 +81,21 @@ const generateInvoicePDF = async (invoice) => {
             z-index: -1000;
             pointer-events: none;
           }
-          .header-table,
-          .details-table,
-          .items-table,
+          .header-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+          }
+          .details-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 16px;
+          }
+          .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 16px;
+          }
           .totals-table {
             width: 100%;
             border-collapse: collapse;
@@ -84,12 +104,20 @@ const generateInvoicePDF = async (invoice) => {
           .invoice-title {
             font-size: 24px;
             font-weight: 800;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
             color: #102a63;
             margin: 0;
+            line-height: 1.1;
+            text-transform: uppercase;
+          }
+          .invoice-number {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 4px;
+            display: block;
           }
           .badge {
-            padding: 10px 14px;
+            padding: 6px 14px;
             font-size: 11px;
             font-weight: 700;
             text-transform: uppercase;
@@ -97,13 +125,24 @@ const generateInvoicePDF = async (invoice) => {
             display: inline-flex;
             align-items: center;
             justify-content: center;
+            letter-spacing: 0.5px;
           }
           .badge-approved { background-color: #ecfdf5; border: 1px solid #bbf7d0; color: #166534; }
           .badge-rejected { background-color: #fee2e2; border: 1px solid #fecaca; color: #991b1b; }
           .badge-paid { background-color: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; }
           .badge-pending { background-color: #fef3c7; border: 1px solid #fde68a; color: #92400e; }
           .badge-draft { background-color: #f1f5f9; border: 1px solid #e2e8f0; color: #475569; }
-          th { font-weight: 700; }
+          th { 
+            font-weight: 700;
+            padding: 8px 8px;
+            font-size: 11px;
+            line-height: 1.2;
+          }
+          td {
+            padding: 6px 8px;
+            font-size: 11px;
+            line-height: 1.3;
+          }
         </style>
       </head>
       <body>
@@ -111,67 +150,74 @@ const generateInvoicePDF = async (invoice) => {
 
         <table class="header-table">
           <tr>
-            <td>
+            <td style="vertical-align: top;">
               <h1 class="invoice-title">${dynamicInvoiceTitle}</h1>
-              <span style="font-size: 12px; color: #64748b;">Num: <b>#${invoice.invoiceNumber}</b></span>
+              <span class="invoice-number">Num: <b>#${invoice.invoiceNumber}</b></span>
             </td>
             <td style="text-align: right; vertical-align: top;">
-              <div class="badge badge-${(invoice.invoiceStatus || "draft").toLowerCase()}">${invoice.invoiceStatus || "Draft"}</div>
-              <p style="font-size: 11px; color: #64748b; margin: 4px 0 0 0;">Date: ${formatDate(invoice.invoiceDate || invoice.createdAt)}</p>
+              <div style="margin-bottom: 6px;">
+                <div class="badge badge-${(invoice.invoiceStatus || "draft").toLowerCase()}">${(invoice.invoiceStatus || "DRAFT").toUpperCase()}</div>
+              </div>
+              <div style="font-size: 12px; color: #64748b;">
+                Date: ${formatDate(invoice.invoiceDate || invoice.createdAt)}
+              </div>
             </td>
           </tr>
         </table>
 
-        <hr style="border: 0; border-top: 2px solid #f1f5f9; margin-bottom: 16px;" />
+        <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 12px 0;" />
 
         <table class="details-table" style="table-layout: fixed;">
           <tr>
-            <td style="vertical-align: top; width: 50%; padding-right: 10px;">
-              <h3 style="font-size: 11px; text-transform: uppercase; color: #475569; margin: 0 0 6px 0; letter-spacing: 0.5px; font-weight: 700;">EXTREME LOGISTIC INVOICE FROM:</h3>
-              <strong style="font-size: 13px; color: #dc2626;">${invoice.payee?.companyName || invoice.payee?.customerName || "N/A"}</strong>
-              <p style="font-size: 11px; line-height: 1.4; color: #475569; margin: 4px 0;">
-                ${invoice.payee?.address1 || invoice.payee?.address || "N/A"}<br/>
-                <b>Driver Name:</b> ${invoice.payee?.contactPerson || invoice.payee?.driverName || "N/A"}<br/>
-                <b>Phone:</b> ${invoice.payee?.phone || "N/A"}<br/>
-                <b>Email:</b> ${invoice.payee?.email || "N/A"}<br/>
-                <b>GST/HST:</b> ${invoice.payee?.gstNumber || "N/A"}
-              </p>
+            <td style="vertical-align: top; width: 50%; padding-right: 16px;">
+              <div style="font-size: 10px; text-transform: uppercase; color: #64748b; margin: 0 0 4px 0; letter-spacing: 0.5px; font-weight: 700;">EXTREME LOGISTIC INVOICE FROM:</div>
+              <div style="margin-top: 4px;">
+                <strong style="font-size: 13px; color: #dc2626; display: block;">${invoice.payee?.companyName || invoice.payee?.customerName || "N/A"}</strong>
+                <div style="color: #475569; font-size: 12px; line-height: 1.4;">
+                  ${invoice.payee?.address1 || invoice.payee?.address || "N/A"}
+                </div>
+                <div style="margin-top: 4px; color: #475569; font-size: 12px; line-height: 1.4;">
+                  <b>Phone:</b> ${invoice.payee?.phone || "N/A"}<br/>
+                  <b>Email:</b> ${invoice.payee?.email || "N/A"}<br/>
+                  <b>GST/HST:</b> ${maskGstNumber(invoice.payee?.gstNumber)}
+                </div>
+              </div>
             </td>
-            <td style="vertical-align: top; width: 50%; padding-left: 10px;">
-              <h3 style="font-size: 11px; text-transform: uppercase; color: #475569; margin: 0 0 6px 0; letter-spacing: 0.5px; font-weight: 700;">INVOICE TO:</h3>
-              <strong style="font-size: 13px; color: #2563eb;">${invoice.customer?.companyName || invoice.customer?.customerName || "N/A"}</strong>
-              <p style="font-size: 11px; line-height: 1.4; color: #475569; margin: 4px 0;">
-                ${invoice.customer?.address1 || invoice.customer?.address || "N/A"}<br/>
-                <b>Attention:</b> ${invoice.customer?.contactPerson || "N/A"}<br/>
-                <b>Phone:</b> ${invoice.customer?.phone || "N/A"}<br/>
-                <b>Email:</b> ${invoice.customer?.email || "N/A"}<br/>
-                <b>GST/HST:</b> ${invoice.customer?.gstNumber || "N/A"}
-              </p>
+            <td style="vertical-align: top; width: 50%; padding-left: 16px;">
+              <div style="font-size: 10px; text-transform: uppercase; color: #64748b; margin: 0 0 4px 0; letter-spacing: 0.5px; font-weight: 700;">INVOICE TO:</div>
+              <div style="margin-top: 4px;">
+                <strong style="font-size: 13px; color: #2563eb; display: block;">${invoice.customer?.companyName || invoice.customer?.customerName || "N/A"}</strong>
+                <div style="color: #475569; font-size: 12px; line-height: 1.4;">
+                  ${invoice.customer?.address1 || invoice.customer?.address || "N/A"}
+                </div>
+                <div style="margin-top: 4px; color: #475569; font-size: 12px; line-height: 1.4;">
+                  <b>Phone:</b> ${invoice.customer?.phone || "N/A"}<br/>
+                  <b>Email:</b> ${invoice.customer?.email || "N/A"}<br/>
+                  <b>GST/HST:</b> ${maskGstNumber(invoice.customer?.gstNumber)}
+                </div>
+              </div>
             </td>
           </tr>
         </table>
 
-        ${
-          invoice.invoicePeriod?.startDate
-            ? `
+        ${invoice.invoicePeriod?.startDate ? `
           <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 10px; border-radius: 4px; font-size: 11px; margin-bottom: 16px; color: #334155;">
             📅 <b>Billing Period:</b> ${formatDate(invoice.invoicePeriod.startDate)} — ${formatDate(invoice.invoicePeriod.endDate)}
           </div>
-        `
-            : ""
-        }
+        ` : ""}
 
         <table class="items-table">
           <thead>
-            <tr style="background-color: #1e3a8a; color: #ffffff;">
-              <th style="padding: 8px 4px; font-size: 11px; border-top-left-radius: 4px; text-align: center; width: 4%;">#</th>
-              <th style="padding: 8px 6px; font-size: 11px; text-align: left; width: 12%;">Date</th>
-              <th style="padding: 8px 6px; font-size: 11px; text-align: left; width: 15%;">VRID</th>
-              <th style="padding: 8px 6px; font-size: 11px; text-align: left; width: 10%;">Route</th>
-              <th style="padding: 8px 6px; font-size: 11px; text-align: left; width: 27%;">Description</th>
-              <th style="padding: 8px 6px; font-size: 11px; text-align: right; width: 12%;">Charges</th>
-              <th style="padding: 8px 4px; font-size: 11px; text-align: center; width: 8%;">Dispatch%</th>
-              <th style="padding: 8px 6px; font-size: 11px; border-top-right-radius: 4px; text-align: right; width: 12%;">Total Amount</th>
+            <tr style="background-color: #102a63; color: #ffffff;">
+              <th style="padding: 8px 8px; font-size: 11px; border-top-left-radius: 4px; text-align: center; width: 5%;">#</th>
+              <th style="padding: 8px 8px; font-size: 11px; text-align: left; width: 12%;">Date</th>
+              <th style="padding: 8px 8px; font-size: 11px; text-align: left; width: 12%;">VRID</th>
+              <th style="padding: 8px 8px; font-size: 11px; text-align: left; width: 14%;">Driver Name</th>
+              <th style="padding: 8px 8px; font-size: 11px; text-align: left; width: 10%;">Route</th>
+              <th style="padding: 8px 8px; font-size: 11px; text-align: left; width: 17%;">Description</th>
+              <th style="padding: 8px 8px; font-size: 11px; text-align: right; width: 10%;">Charges</th>
+              <th style="padding: 8px 8px; font-size: 11px; text-align: center; width: 10%;">Dispatch%</th>
+              <th style="padding: 8px 8px; font-size: 11px; border-top-right-radius: 4px; text-align: right; width: 10%;">Total</th>
             </tr>
           </thead>
           <tbody>
@@ -179,55 +225,53 @@ const generateInvoicePDF = async (invoice) => {
           </tbody>
         </table>
 
-        <table class="totals-table" style="margin-left: auto; width: 35%; margin-top: 10px;">
-          <tr>
-            <td style="padding: 10px 12px; font-size: 12px; color: #475569;">Subtotal:</td>
-            <td style="padding: 10px 12px; font-size: 12px; text-align: right; color: #0f172a; font-weight: 500;">${formatCurrency(invoice.subtotal)}</td>
+        <table class="totals-table" style="margin-left: auto; width: 260px; margin-top: 10px;">
+          <tr style="padding: 4px 0;">
+            <td style="padding: 4px 0; font-size: 12px; color: #475569;">Subtotal:</td>
+            <td style="padding: 4px 0; font-size: 12px; text-align: right; color: #0f172a; font-weight: 500;">${formatCurrency(invoice.subtotal)}</td>
           </tr>
-          <tr style="border-top: 1px solid #e2e8f0;">
-            <td style="padding: 16px 12px 12px 12px; font-size: 13px; font-weight: bold; color: #1e3a8a;">Grand Total:</td>
-            <td style="padding: 16px 12px 12px 12px; font-size: 15px; font-weight: bold; text-align: right; color: #2563eb;">${formatCurrency(invoice.grandTotal)}</td>
+          ${invoice.tax ? `
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 4px 0; font-size: 12px; color: #475569;">Tax / VAT:</td>
+            <td style="padding: 4px 0; font-size: 12px; text-align: right; color: #0f172a; font-weight: 500;">${formatCurrency(invoice.tax)}</td>
+          </tr>
+          ` : ''}
+          <tr style="border-top: 1px solid #e2e8f0; margin-top: 8px;">
+            <td style="padding: 8px 0; font-size: 13px; font-weight: bold; color: #1e293b;">Grand Total:</td>
+            <td style="padding: 8px 0; font-size: 16px; font-weight: bold; text-align: right; color: #2563eb;">${invoice.currency || 'CAD'} ${formatCurrency(invoice.grandTotal)}</td>
           </tr>
         </table>
 
-        ${
-          invoice.accountNumber || invoice.payee?.eTransferAddress
-            ? `
-          <div style="margin-top: 24px; border-top: 1px dashed #cbd5e1; padding-top: 12px;">
+        ${invoice.accountNumber || invoice.institutionNumber || invoice.transitNumber || invoice.customer?.eTransfer || invoice.payee?.eTransferAddress ? `
+          <div style="padding: 12px 16px; background-color: #f8fafc; border-radius: 8px; margin-top: 12px;">
             <table style="width: 100%; border-collapse: collapse;">
               <tr>
                 ${invoice.accountNumber ? `
-                  <td style="width: ${invoice.payee?.eTransferAddress ? '50%' : '100%'}; padding-right: ${invoice.payee?.eTransferAddress ? '10px' : '0'}; vertical-align: top;">
-                    <h4 style="font-size: 10px; text-transform: uppercase; color: #64748b; margin: 0 0 4px 0; letter-spacing: 0.5px;">Direct Deposit Details</h4>
-                    <p style="font-size: 10px; color: #475569; margin: 0; line-height: 1.6; white-space: nowrap;">
-                      Institution Number: ${invoice.institutionNumber || "N/A"} | Transit Number: ${invoice.transitNumber || "N/A"} | Account Number: ${invoice.accountNumber}
-                    </p>
+                  <td style="width: ${(invoice.customer?.eTransfer || invoice.payee?.eTransferAddress) ? '50%' : '100%'}; padding-right: ${(invoice.customer?.eTransfer || invoice.payee?.eTransferAddress) ? '16px' : '0'}; vertical-align: top;">
+                    <div style="font-size: 10px; text-transform: uppercase; color: #64748b; margin: 0 0 2px 0; letter-spacing: 0.5px; font-weight: 700;">Direct Deposit Details</div>
+                    <div style="font-size: 12px; color: #475569; line-height: 1.6;">
+                      Institution: ${invoice.institutionNumber || "N/A"} | Transit: ${invoice.transitNumber || "N/A"} | Account: ${invoice.accountNumber}
+                    </div>
                   </td>
-                ` : ''}
-                ${invoice.payee?.eTransferAddress ? `
-                  <td style="width: ${invoice.accountNumber ? '50%' : '100%'}; padding-left: ${invoice.accountNumber ? '10px' : '0'}; vertical-align: top; ${invoice.accountNumber ? 'border-left: 1px dashed #cbd5e1;' : ''}">
-                    <h4 style="font-size: 10px; text-transform: uppercase; color: #2563eb; margin: 0 0 4px 0; letter-spacing: 0.5px; font-weight: 700;">💥 E-Transfer Details</h4>
-                    <p style="font-size: 10px; color: #1e293b; margin: 0; line-height: 1.4; font-weight: 600;">
-                      <b>E-Transfer Email:</b> ${invoice.payee?.eTransferAddress}
-                    </p>
+                ` : '<td style="width: 100%; vertical-align: top;">'}
+                ${invoice.customer?.eTransfer || invoice.payee?.eTransferAddress ? `
+                  <td style="width: ${invoice.accountNumber ? '50%' : '100%'}; padding-left: ${invoice.accountNumber ? '16px' : '0'}; vertical-align: top; ${invoice.accountNumber ? 'border-left: 1px dashed #cbd5e1;' : ''}">
+                    <div style="font-size: 10px; text-transform: uppercase; color: #2563eb; margin: 0 0 2px 0; letter-spacing: 0.5px; font-weight: 700;">💥 E-Transfer Details</div>
+                    <div style="font-size: 12px; color: #1e293b; font-weight: 600; line-height: 1.4;">
+                      E-Transfer Email: ${invoice.customer?.eTransfer || invoice.payee?.eTransferAddress}
+                    </div>
                   </td>
                 ` : ''}
               </tr>
             </table>
           </div>
-        `
-            : ""
-        }
+        ` : ""}
 
-        ${
-          invoice.notes
-            ? `
+        ${invoice.notes ? `
           <div style="margin-top: 12px; font-size: 10px; color: #64748b; font-style: italic;">
             <b>Notes:</b> ${invoice.notes}
           </div>
-        `
-            : ""
-        }
+        ` : ""}
       </body>
     </html>
   `;

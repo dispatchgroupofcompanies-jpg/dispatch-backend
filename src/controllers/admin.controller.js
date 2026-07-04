@@ -1,5 +1,7 @@
 const Invoice = require("../models/invoice.model");
-
+const Appointment = require("../models/appointment.model");
+const path = require("path");
+const sendInvoiceEmail = require("../services/email.service");
 exports.getadminDashboard = async (req, res) => {
   try {
     // 1. Total Invoices ka count
@@ -109,6 +111,29 @@ exports.updateInvoiceStatus = async (req, res) => {
       });
     }
 
+    // Send email when invoice is approved
+    if (status === "approved") {
+      try {
+        const pdfPath = path.join(__dirname, "../..", updatedInvoice.pdfUrl || "");
+        const recipientsList = [
+          updatedInvoice.customer?.email,
+          updatedInvoice.payee?.email,
+          "dispatchgroupofcompanies@gmail.com"
+        ].filter(Boolean);
+
+        if (recipientsList.length > 0) {
+          await sendInvoiceEmail(recipientsList, pdfPath, updatedInvoice.invoiceNumber);
+          
+          updatedInvoice.emailStatus = "sent";
+          updatedInvoice.emailSentAt = new Date();
+          await updatedInvoice.save();
+        }
+      } catch (mailErr) {
+        console.error("❌ Email delivery failed:", mailErr.message);
+        // Don't fail the request if email fails
+      }
+    }
+
     res.status(200).json({
       success: true,
       message: `Invoice status updated to ${status} successfully!`,
@@ -149,6 +174,37 @@ exports.rejectInvoice = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Internal server error while rejecting invoice",
+    });
+  }
+};
+
+exports.getAllApointments = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const totalAppointments = await Appointment.countDocuments();
+
+    const appointments = await Appointment.find()
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+    
+    res.status(200).json({
+      success: true,
+      count: appointments.length,
+      totalPages: Math.ceil(totalAppointments / limit),
+      currentPage: page,
+      totalAppointments,
+      data: appointments,
+    });
+  }
+  catch (error) {
+    console.error("Error fetching all appointments:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error while fetching appointments",
     });
   }
 };

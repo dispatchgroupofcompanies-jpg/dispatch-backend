@@ -6,7 +6,6 @@ const generateInvoicePDF = require("../services/pdf.service");
 const sendInvoiceEmail = require("../services/email.service");
 
 const createInvoice = async (req, res) => {
-  console.log("🚀 STEP 1: Create Invoice Dispatch Hook Triggered");
   try {
     const data = req.body;
     if (!data?.trips?.length) {
@@ -16,16 +15,43 @@ const createInvoice = async (req, res) => {
       });
     }
 
-    const { trips, subtotal, tax, grandTotal } = calculateInvoice(data.trips);
+    // Invoice calculation utility trigger
+    const calculated = calculateInvoice(data.trips);
+
+    // STEP: Ensure loadId1, loadId2 and driverName pass safely into the mapped calculated trips array
+    const finalizedTrips = calculated.trips.map((calculatedTrip, index) => {
+      const originalTrip = data.trips[index];
+      
+      // Agar VRID 'T' se start hota hai, toh input standard uppercase structure clear karega
+      const cleanVrid = originalTrip?.vrid ? String(originalTrip.vrid).trim().toUpperCase() : "";
+
+      return {
+        ...calculatedTrip,
+        vrid: cleanVrid,
+        // Passing loadId1, loadId2 and driverName securely if present
+        loadId1: cleanVrid.startsWith("T") && originalTrip?.loadId1 
+          ? String(originalTrip.loadId1).trim() 
+          : originalTrip?.loadId1 || undefined,
+        loadId2: cleanVrid.startsWith("T") && originalTrip?.loadId2 
+          ? String(originalTrip.loadId2).trim() 
+          : originalTrip?.loadId2 || undefined,
+        driverName: cleanVrid.startsWith("T") && originalTrip?.driverName 
+          ? String(originalTrip.driverName).trim() 
+          : originalTrip?.driverName || undefined,
+        route: originalTrip?.route,
+        pickup: originalTrip?.pickup,
+        drop: originalTrip?.drop,
+      };
+    });
 
     const invoiceNumber = await generateInvoiceNumber();    
     const invoicePayload = {
       ...data,
       invoiceNumber,
-      trips,
-      subtotal,
-      tax,
-      grandTotal,
+      trips: finalizedTrips,
+      subtotal: calculated.subtotal,
+      tax: calculated.tax,
+      grandTotal: calculated.grandTotal,
       invoiceDate: data.invoiceDate ? new Date(data.invoiceDate) : new Date(),
       createdBy: req.user?._id || null, 
     };
@@ -37,6 +63,7 @@ const createInvoice = async (req, res) => {
       };
     }
 
+    // Yahan Mongoose schema strict dynamically valid validation test pass karega
     const invoice = await Invoice.create(invoicePayload);
 
     let pdfPath = null;
@@ -49,7 +76,6 @@ const createInvoice = async (req, res) => {
       console.error("❌ STEP 6b: PDF Render Engine Exception encountered:", err.message);
     }
 
-    
     return res.status(201).json({
       success: true,
       message: "Invoice compiled and saved to cloud databases. Waiting for status updates.",
@@ -58,6 +84,16 @@ const createInvoice = async (req, res) => {
 
   } catch (error) {
     console.error("🔥 SYSTEM FAILURE INSIDE CREATE INVOICE DISPATCH HOOK:", error);
+    
+    // Agar mongoose validation fail hogi (Load ID skip karne par), toh yeh specific error feedback dega
+    if (error.name === "ValidationError") {
+      return res.status(400).json({
+        success: false,
+        message: "Database schema validation tracking broke down.",
+        error: error.message,
+      });
+    }
+
     return res.status(500).json({
       success: false,
       message: "Internal runtime server core crash detected.",

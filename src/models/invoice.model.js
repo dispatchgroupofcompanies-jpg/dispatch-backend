@@ -9,6 +9,48 @@ const tripSchema = new mongoose.Schema(
   {
     tripDate: { type: Date, required: true },
     vrid: { type: String, required: true, trim: true, uppercase: true },
+    
+    // Load ID 1 - always required
+    loadId1: {
+      type: String,
+      trim: true,
+      required: true,
+      validate: {
+        validator: function (value) {
+          return value && value.trim().length > 0;
+        },
+        message: "Load ID 1 is required!",
+      },
+    },
+    
+    // Load ID 2 - only required when VRID starts with T
+    loadId2: {
+      type: String,
+      trim: true,
+      validate: {
+        validator: function (value) {
+          if (this.vrid && this.vrid.toUpperCase().startsWith("T")) {
+            return value && value.trim().length > 0;
+          }
+          return true; // Optional when VRID doesn't start with T
+        },
+        message: "Load ID 2 is required when VRID starts with 'T'!",
+      },
+    },
+    
+    // Driver Name - always required
+    driverName: {
+      type: String,
+      trim: true,
+      required: true,
+      validate: {
+        validator: function (value) {
+          return value && value.trim().length > 0;
+        },
+        message: "Driver name is required!",
+      },
+    },
+    
     route: { type: String, trim: true },
     pickup: { type: String, trim: true },
     drop: { type: String, trim: true },
@@ -34,12 +76,11 @@ const invoiceSchema = new mongoose.Schema(
       default: "single",
     },
 
-    // FIXED HERE: Saare valid enums invoiceSchema ke andar add kar diye hain
     invoiceStatus: {
       type: String,
       enum: ["draft", "sent", "paid", "cancelled", "approved", "rejected", "pending"],
       default: "draft",
-      lowercase: true, // Input string auto-lowercase ho jayegi validation se pehle
+      lowercase: true,
     },
 
     currency: { type: String, default: "CAD" },
@@ -67,6 +108,7 @@ const invoiceSchema = new mongoose.Schema(
       phone: String,
       email: String,
       gstNumber: String,
+      eTransfer: String,
     },
 
     trips: { type: [tripSchema], required: true },

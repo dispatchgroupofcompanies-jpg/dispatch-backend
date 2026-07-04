@@ -19,9 +19,7 @@ router.get("/", getAppointments);
 // Get appointment by ID
 router.get("/:id", getAppointmentById);
 
-// Update appointment status
 router.patch("/:appointmentId/status", updateAppointmentStatus);
-
 // Delete appointment
 router.delete("/:appointmentId", deleteAppointment);
 
@@ -44,5 +42,6 @@ router.put("/:id", async (req, res) => {
 
 // Download appointment PDF
 router.get("/:id/download", downloadAppointmentPDF);
+
 
 module.exports = router;

@@ -4,15 +4,16 @@ const {
   getadminDashboard,
   getAllInvoices,
   updateInvoiceStatus,
-  rejectInvoice
+  rejectInvoice,
+  getAllApointments
 } = require("../controllers/admin.controller");
 const authMiddleware = require("../middleware/auth.middleware");
 
-// Dashboard Stats Route
 router.get("/stats", authMiddleware, getadminDashboard);
 
 router.get("/invoices", authMiddleware, getAllInvoices);
-router.patch("/approve/:id/status", authMiddleware, updateInvoiceStatus);
-router.patch("/rejected/:id/status", rejectInvoice);  
+router.patch("/approved/:id/status", authMiddleware, updateInvoiceStatus);
+router.patch("/rejected/:id/status", authMiddleware, rejectInvoice); 
+router.get("/all-appointments", authMiddleware, getAllApointments); 
 
 module.exports = router;

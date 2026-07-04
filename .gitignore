@@ -1,7 +1,16 @@
+# Dependency folders
 node_modules/
+
+# Environment variables (Never push your secrets!)
 .env
-logs/
-*.log
-dist/
-build/
-coverage/
+.env.local
+
+# Uploads folder (Taaki generated PDFs GitHub par upload na ho)
+uploads/
+uploads/invoices/
+
+# Logs & temporary files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
