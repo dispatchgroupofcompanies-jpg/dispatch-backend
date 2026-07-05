@@ -112,7 +112,10 @@ const updateAppointmentStatus = async (req, res) => {
       console.log("📧 STEP 3: Attempting to send confirmation email...");
       
       // Guard clause: Only trigger email if recipient field actually exists
-      if (!appointment.email) {
+      // Use carrierEmail as the primary email field (this is what the form sends)
+      const recipientEmail = appointment.carrierEmail || appointment.email;
+      
+      if (!recipientEmail) {
         const warningMsg = `⚠️ WARNING: Appointment ${appointment._id} confirmed, but has no email address. Skipping notification.`;
         console.warn(warningMsg);
       } else {
@@ -126,10 +129,10 @@ const updateAppointmentStatus = async (req, res) => {
           console.log("📄 Generating email template...");
           const emailContent = getEmailTemplate(appointment, dateFormatted);
           
-          console.log("📤 Sending email to:", appointment.email);
+          console.log("📤 Sending email to:", recipientEmail);
           
           const emailResult = await sendInvoiceEmail(
-            [appointment.email],
+            [recipientEmail],
             null,
             "Appointment Confirmed",
             emailContent
@@ -137,7 +140,7 @@ const updateAppointmentStatus = async (req, res) => {
           
           console.log("✅ STEP 4: Email sent successfully!");
           console.log("📬 Email Details:", {
-            to: appointment.email,
+            to: recipientEmail,
             subject: "Appointment Confirmed",
             messageId: emailResult?.messageId,
             response: emailResult?.response
@@ -147,7 +150,7 @@ const updateAppointmentStatus = async (req, res) => {
           console.error("📧 Email Error Details:", {
             error: emailErr.message,
             code: emailErr.code,
-            to: appointment.email,
+            to: recipientEmail,
             subject: "Appointment Confirmed"
           });
         }
