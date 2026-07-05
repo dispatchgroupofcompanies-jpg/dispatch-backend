@@ -11,7 +11,6 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
       unique: true,
-      index: true,
       lowercase: true,
     },
     password: {
@@ -27,7 +26,5 @@ const userSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
-
-userSchema.index({ email: 1 });
 
 module.exports = mongoose.model("User", userSchema);

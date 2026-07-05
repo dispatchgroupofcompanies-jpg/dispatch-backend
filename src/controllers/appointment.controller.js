@@ -14,6 +14,8 @@ const createAppointment = async (req, res) => {
     console.log("✅ STEP 2: Appointment created successfully in database");
     console.log("📊 Appointment Details:", {
       id: appointment._id,
+      carrierName: appointment.carrierName,
+      carrierEmail: appointment.carrierEmail,
       companyName: appointment.companyName,
       email: appointment.email,
       appointmentDate: appointment.appointmentDate,
@@ -98,6 +100,8 @@ const updateAppointmentStatus = async (req, res) => {
     console.log(`✅ STEP 2: Appointment status updated to '${status}' in database`);
     console.log("📊 Updated Appointment:", {
       id: appointment._id,
+      carrierName: appointment.carrierName,
+      carrierEmail: appointment.carrierEmail,
       companyName: appointment.companyName,
       email: appointment.email,
       status: appointment.status
@@ -228,20 +232,19 @@ const getEmailTemplate = (appointment, dateFormatted) => `
             </tr>
             <tr>
               <td style="padding: 30px; color: #334155;">
-                <p style="font-size: 16px; line-height: 1.6; margin: 0 0 15px 0;">Dear ${appointment.contactPerson || appointment.companyName},</p>
+                <p style="font-size: 16px; line-height: 1.6; margin: 0 0 15px 0;">Dear ${appointment.contactPerson || appointment.carrierName},</p>
                 <p style="font-size: 14px; line-height: 1.6; margin: 0 0 25px 0;">Your appointment has been confirmed! Here are your appointment details:</p>
                 
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; margin-bottom: 20px;">
                   <tr>
                     <td style="padding: 15px;">
-                      <h2 style="margin: 0 0 15px 0; color: #1e3a8a; font-size: 16px; font-weight: bold;">Company Details</h2>
+                      <h2 style="margin: 0 0 15px 0; color: #1e3a8a; font-size: 16px; font-weight: bold;">Carrier Details</h2>
                       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
-                        <tr><td style="padding: 5px 0; font-size: 14px; line-height: 1.6;"><strong>Company:</strong> ${appointment.companyName}</td></tr>
+                        <tr><td style="padding: 5px 0; font-size: 14px; line-height: 1.6;"><strong>Carrier Name:</strong> ${appointment.carrierName}</td></tr>
                         <tr><td style="padding: 5px 0; font-size: 14px; line-height: 1.6;"><strong>Contact Person:</strong> ${appointment.contactPerson || "N/A"}</td></tr>
-                        <tr><td style="padding: 5px 0; font-size: 14px; line-height: 1.6;"><strong>Email:</strong> ${appointment.email}</td></tr>
-                        <tr><td style="padding: 5px 0; font-size: 14px; line-height: 1.6;"><strong>Phone:</strong> ${appointment.phone}</td></tr>
-                        ${appointment.address ? `<tr><td style="padding: 5px 0; font-size: 14px; line-height: 1.6;"><strong>Address:</strong> ${appointment.address}</td></tr>` : ""}
-                        ${appointment.gstHst ? `<tr><td style="padding: 5px 0; font-size: 14px; line-height: 1.6;"><strong>GST/HST:</strong> ${appointment.gstHst}</td></tr>` : ""}
+                        <tr><td style="padding: 5px 0; font-size: 14px; line-height: 1.6;"><strong>Email:</strong> ${appointment.carrierEmail}</td></tr>
+                        <tr><td style="padding: 5px 0; font-size: 14px; line-height: 1.6;"><strong>Phone:</strong> ${appointment.carrierPhone}</td></tr>
+                        ${appointment.carrierAddress ? `<tr><td style="padding: 5px 0; font-size: 14px; line-height: 1.6;"><strong>Address:</strong> ${appointment.carrierAddress}</td></tr>` : ""}
                       </table>
                     </td>
                   </tr>
