@@ -54,7 +54,8 @@ const getAppointmentById = async (req, res) => {
 const updateAppointmentStatus = async (req, res) => {
   try {
     const { appointmentId } = req.params;
-    const { status } = req.body;
+    const { status } = req.body; 
+    console.log('data', req.body);
 
     if (!status) {
       return res.status(400).json({
@@ -226,7 +227,7 @@ const getEmailTemplate = (appointment, dateFormatted) => `
     </table>
   </body>
   </html>
-`;
+
 
 module.exports = {
   createAppointment,
