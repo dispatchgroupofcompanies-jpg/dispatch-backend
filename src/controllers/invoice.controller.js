@@ -102,16 +102,34 @@ const createInvoice = async (req, res) => {
   }
 };
 
-// 2. GET ALL INVOICES
+// 2. GET ALL INVOICES (user-specific or all for admin)
 const getInvoiceList = async (req, res) => {
   try {
-    const invoices = await Invoice.find().sort({ createdAt: -1 });
+    console.log("🔍 getInvoiceList - req.user:", req.user ? "exists" : "undefined");
+    console.log("🔍 getInvoiceList - req.accountType:", req.accountType);
+    
+    let query = {};
+    
+    // If user is not admin, filter by createdBy
+    if (req.accountType !== "admin") {
+      const userId = req.user?._id;
+      if (!userId) {
+        return res.status(401).json({ 
+          success: false, 
+          message: "User not authenticated" 
+        });
+      }
+      query.createdBy = userId;
+    }
+    
+    const invoices = await Invoice.find(query).sort({ createdAt: -1 });
     return res.json({
       success: true,
       total: invoices.length,
       data: invoices,
     });
   } catch (error) {
+    console.error("Error in getInvoiceList:", error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };

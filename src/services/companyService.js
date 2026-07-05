@@ -1,10 +1,16 @@
-import CompanyProfile from "../models/CompanyProfile.js";
+const CompanyProfile = require("../models/CompanyProfile.js");
 
-export const getCompanyProfileService = async () => {
+const getCompanyProfileService = async (userId = null, isAdmin = false) => {
+  if (isAdmin) {
+    return await CompanyProfile.find({}); 
+  }
+  if (userId) {
+    return await CompanyProfile.find({ userId }); 
+  }
   return await CompanyProfile.find({}); 
 };
 
-export const saveOrUpdateProfileService = async (profileData) => {
+const saveOrUpdateProfileService = async (profileData, userId = null) => {
   if (profileData._id) {
     return await CompanyProfile.findByIdAndUpdate(
       profileData._id,
@@ -13,12 +19,27 @@ export const saveOrUpdateProfileService = async (profileData) => {
     );
   }
 
+  // Add userId if provided
+  if (userId && !profileData.userId) {
+    profileData.userId = userId;
+  }
+
   return await CompanyProfile.create(profileData);
 };
 
-export const deleteProfileService = async (id) => {
+const deleteProfileService = async (id, isAdmin = false) => {
   if (id) {
     return await CompanyProfile.findByIdAndDelete(id);
   }
-  return await CompanyProfile.deleteMany({});
+  // Only allow delete many for admin
+  if (isAdmin) {
+    return await CompanyProfile.deleteMany({});
+  }
+  return { message: "Unauthorized" };
+};
+
+module.exports = {
+  getCompanyProfileService,
+  saveOrUpdateProfileService,
+  deleteProfileService
 };

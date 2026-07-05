@@ -1,16 +1,39 @@
 const Invoice = require("../models/invoice.model");
 
-// GET DASHBOARD STATS
+// GET DASHBOARD STATS (user-specific or all for admin)
 const getDashboardStats = async (req, res) => {
   try {
+    console.log("🔍 getDashboardStats - req.user:", req.user ? "exists" : "undefined");
+    console.log("🔍 getDashboardStats - req.accountType:", req.accountType);
+    
+    let matchQuery = {};
+    
+    // If user is not admin, filter by createdBy
+    if (req.accountType !== "admin") {
+      const userId = req.user?._id;
+      if (!userId) {
+        return res.status(401).json({ 
+          success: false, 
+          message: "User not authenticated" 
+        });
+      }
+      matchQuery.createdBy = userId;
+    }
+
     // Total Invoices
-    const totalInvoices = await Invoice.countDocuments();
+    const totalInvoices = await Invoice.countDocuments(matchQuery);
 
     // Cancelled Invoices
-    const cancelledInvoices = await Invoice.countDocuments({ invoiceStatus: "cancelled" });
+    const cancelledInvoices = await Invoice.countDocuments({ 
+      ...matchQuery, 
+      invoiceStatus: "cancelled" 
+    });
 
     // Total Earnings (sum of all grandTotal)
     const earningsResult = await Invoice.aggregate([
+      {
+        $match: matchQuery
+      },
       {
         $group: {
           _id: null,
@@ -28,6 +51,9 @@ const getDashboardStats = async (req, res) => {
     // Invoice Status Breakdown
     const statusBreakdown = await Invoice.aggregate([
       {
+        $match: matchQuery
+      },
+      {
         $group: {
           _id: "$invoiceStatus",
           count: { $sum: 1 },
@@ -38,6 +64,9 @@ const getDashboardStats = async (req, res) => {
 
     // Top Companies by Invoice Amount
     const topCompanies = await Invoice.aggregate([
+      {
+        $match: matchQuery
+      },
       {
         $group: {
           _id: "$customer.companyName",
@@ -54,7 +83,7 @@ const getDashboardStats = async (req, res) => {
     ]);
 
     // Recent Invoices
-    const recentInvoices = await Invoice.find()
+    const recentInvoices = await Invoice.find(matchQuery)
       .sort({ createdAt: -1 })
       .limit(10)
       .select("invoiceNumber invoiceStatus grandTotal customer.companyName createdAt");
@@ -66,6 +95,7 @@ const getDashboardStats = async (req, res) => {
     const monthlyStats = await Invoice.aggregate([
       {
         $match: {
+          ...matchQuery,
           createdAt: { $gte: sixMonthsAgo }
         }
       },

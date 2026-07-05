@@ -1,23 +1,49 @@
-import { 
+const { 
   getCompanyProfileService, 
   saveOrUpdateProfileService, 
   deleteProfileService 
-} from "../services/companyService.js";
+} = require("../services/companyService.js");
 
-export const getProfile = async (req, res) => {
+const getProfile = async (req, res) => {
   try {
-    const profiles = await getCompanyProfileService();
+    console.log("🔍 getProfile - req.user:", req.user ? "exists" : "undefined");
+    console.log("🔍 getProfile - req.accountType:", req.accountType);
+    
+    const isAdmin = req.accountType === "admin";
+    const userId = req.user?._id;
+    
+    if (!userId && !isAdmin) {
+      return res.status(401).json({ 
+        success: false, 
+        error: "User not authenticated" 
+      });
+    }
+    
+    const profiles = await getCompanyProfileService(userId, isAdmin);
     return res.status(200).json({ success: true, data: profiles });
   } catch (error) {
+    console.error("Error in getProfile:", error);
     return res.status(500).json({ success: false, error: error.message });
   }
 };
 
-export const saveProfile = async (req, res) => {
+const saveProfile = async (req, res) => {
   try {
-    const data = req.body;
+    console.log("🔍 saveProfile - req.user:", req.user ? "exists" : "undefined");
+    console.log("🔍 saveProfile - req.accountType:", req.accountType);
     
-    const updatedProfile = await saveOrUpdateProfileService(data);
+    const data = req.body;
+    const isAdmin = req.accountType === "admin";
+    const userId = req.user?._id;
+    
+    if (!userId && !isAdmin) {
+      return res.status(401).json({ 
+        success: false, 
+        error: "User not authenticated" 
+      });
+    }
+    
+    const updatedProfile = await saveOrUpdateProfileService(data, userId);
 
     return res.status(200).json({ success: true, data: updatedProfile });
   } catch (error) {
@@ -26,12 +52,19 @@ export const saveProfile = async (req, res) => {
   }
 };
 
-export const clearProfile = async (req, res) => {
+const clearProfile = async (req, res) => {
   try {
     const { id } = req.query; 
-    await deleteProfileService(id);
+    const isAdmin = req.accountType === "admin";
+    await deleteProfileService(id, isAdmin);
     return res.status(200).json({ success: true, message: "Profile cleared successfully" });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }
+};
+
+module.exports = {
+  getProfile,
+  saveProfile,
+  clearProfile
 };

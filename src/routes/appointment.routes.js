@@ -9,6 +9,10 @@ const {
   deleteAppointment,
   downloadAppointmentPDF,
 } = require("../controllers/appointment.controller");
+const authenticate = require("../middleware/auth.middleware");
+
+// All routes require authentication
+router.use(authenticate);
 
 // Create new appointment
 router.post("/", createAppointment);

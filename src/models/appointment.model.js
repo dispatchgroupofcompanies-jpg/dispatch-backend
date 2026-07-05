@@ -250,6 +250,13 @@ const appointmentSchema = new mongoose.Schema(
       trim: true,
     },
 
+    // User reference for data isolation
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: false, // Optional for backward compatibility
+    },
+
     status: {
       type: String,
       enum: ["pending", "confirmed", "cancelled", "completed"],

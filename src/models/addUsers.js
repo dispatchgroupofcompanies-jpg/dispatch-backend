@@ -1,40 +1,38 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
-const userSchema = new mongoose.Schema(
+const UserSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: true,
+      required: [true, "Name is required"],
       trim: true,
     },
     email: {
       type: String,
-      required: true,
+      required: [true, "Email is required"],
       unique: true,
+      index: true, // Optimized indexing for fast lookups
       lowercase: true,
+      trim: true,
     },
     password: {
       type: String,
-      required: true,
+      required: [true, "Password is required"],
     },
     address: {
       type: String,
-      required: true,
+      required: [true, "Address is required"],
       trim: true,
     },
-    // 👈 NEW ROLE FIELD ADDED WITH DEFAULT VALUE
-    role: {
-      type: String,
-      enum: ["user", "admin"], 
-      default: "user", 
-    },
   },
-  { timestamps: true }
+  {
+    timestamps: true, // Automatically manages createdAt and updatedAt
+  }
 );
 
 // Hash password before saving to the database
-userSchema.pre("save", async function () {
+UserSchema.pre("save", async function () {
   if (!this.isModified("password")) return;
   try {
     const salt = await bcrypt.genSalt(10);
@@ -44,4 +42,4 @@ userSchema.pre("save", async function () {
   }
 });
 
-module.exports = mongoose.model("User", userSchema);
+module.exports = mongoose.model("addUser", UserSchema);

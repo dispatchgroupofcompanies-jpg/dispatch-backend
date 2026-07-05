@@ -10,6 +10,7 @@ const connectDB = require("./config/db");
 const companyRoutes = require("./routes/companyRoutes");
 const appointmentRoutes = require("./routes/appointment.routes");
 const adminRoutes = require("./routes/admin.routes");
+const adminUserRoutes = require("./routes/userRoutes");
 
 const app = express();
 
@@ -47,5 +48,6 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/company", companyRoutes);
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/admin/users", adminUserRoutes); 
 
 module.exports = app;
