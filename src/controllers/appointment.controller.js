@@ -6,7 +6,19 @@ const generateAppointmentPDF = require("../services/appointment-pdf.service");
 // Create a new appointment
 const createAppointment = async (req, res) => {
   try {
+    console.log("📝 STEP 1: Creating new appointment...");
+    console.log("📋 Appointment Data:", JSON.stringify(req.body, null, 2));
+    
     const appointment = await Appointment.create(req.body);
+    
+    console.log("✅ STEP 2: Appointment created successfully in database");
+    console.log("📊 Appointment Details:", {
+      id: appointment._id,
+      companyName: appointment.companyName,
+      email: appointment.email,
+      appointmentDate: appointment.appointmentDate,
+      status: appointment.status
+    });
 
     return res.status(201).json({
       success: true,
@@ -14,7 +26,7 @@ const createAppointment = async (req, res) => {
       data: appointment,
     });
   } catch (error) {
-    console.error("Error creating appointment:", error);
+    console.error("❌ ERROR: Failed to create appointment:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to book appointment.",
@@ -82,12 +94,23 @@ const updateAppointmentStatus = async (req, res) => {
 
     appointment.status = status.toLowerCase();
     await appointment.save();
+    
+    console.log(`✅ STEP 2: Appointment status updated to '${status}' in database`);
+    console.log("📊 Updated Appointment:", {
+      id: appointment._id,
+      companyName: appointment.companyName,
+      email: appointment.email,
+      status: appointment.status
+    });
 
     // Send email only when status is confirmed
     if (status.toLowerCase() === "confirmed") {
+      console.log("📧 STEP 3: Attempting to send confirmation email...");
+      
       // Guard clause: Only trigger email if recipient field actually exists
       if (!appointment.email) {
-        console.warn(`[Warning] Appointment ${appointment._id} confirmed, but has no email address. Skipping notification.`);
+        const warningMsg = `⚠️ WARNING: Appointment ${appointment._id} confirmed, but has no email address. Skipping notification.`;
+        console.warn(warningMsg);
       } else {
         try {
           const dateFormatted = new Date(appointment.appointmentDate).toLocaleDateString("en-CA", {
@@ -96,20 +119,41 @@ const updateAppointmentStatus = async (req, res) => {
             day: "numeric",
           });
 
+          console.log("📄 Generating email template...");
           const emailContent = getEmailTemplate(appointment, dateFormatted);
-
-          await sendInvoiceEmail(
+          
+          console.log("📤 Sending email to:", appointment.email);
+          
+          const emailResult = await sendInvoiceEmail(
             [appointment.email],
             null,
             "Appointment Confirmed",
             emailContent
           );
+          
+          console.log("✅ STEP 4: Email sent successfully!");
+          console.log("📬 Email Details:", {
+            to: appointment.email,
+            subject: "Appointment Confirmed",
+            messageId: emailResult?.messageId,
+            response: emailResult?.response
+          });
         } catch (emailErr) {
-          console.error("Appointment confirmation email failed to send:", emailErr);
+          console.error("❌ ERROR: Appointment confirmation email failed to send:");
+          console.error("📧 Email Error Details:", {
+            error: emailErr.message,
+            code: emailErr.code,
+            to: appointment.email,
+            subject: "Appointment Confirmed"
+          });
         }
       }
+    } else {
+      console.log(`ℹ️ Status is '${status}', not sending confirmation email (only sends for 'confirmed')`);
     }
 
+    console.log("✅ STEP 5: Status update completed successfully");
+    
     return res.status(200).json({
       success: true,
       message: `Appointment status updated to ${status}.`,
