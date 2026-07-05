@@ -271,7 +271,7 @@ const getEmailTemplate = (appointment, dateFormatted) => `
     </table>
   </body>
   </html>
-
+`;
 
 module.exports = {
   createAppointment,
