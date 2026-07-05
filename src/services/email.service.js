@@ -42,14 +42,27 @@ const sendInvoiceEmail = async (emailsList, pdfPath, invoiceNumber, customSubjec
       path: pdfPath,
     }] : [];
 
-    const result = await transporter.sendMail({
+    const mailOptions = {
       from: `"Dispatch Group" <${process.env.EMAIL_USER}>`,
       to: finalRecipients, 
       subject: subject,
-      text: customSubject ? "Please view this email in HTML format." : `Hello,\n\nPlease find attached your professional copy of Invoice #${invoiceNumber}.\n\nPayment Methods:\n- Direct Deposit: See attached PDF for banking details\n- E-Transfer: See attached PDF for E-Transfer email address\n\nThank you for business!`,
-      html: html,
-      attachments: attachments,
-    });
+    };
+
+    // If custom HTML is provided, send as HTML email
+    if (customHtml) {
+      mailOptions.html = customHtml;
+      mailOptions.text = "Please view this email in HTML format.";
+    } else {
+      mailOptions.text = `Hello,\n\nPlease find attached your professional copy of Invoice #${invoiceNumber}.\n\nPayment Methods:\n- Direct Deposit: See attached PDF for banking details\n- E-Transfer: See attached PDF for E-Transfer email address\n\nThank you for business!`;
+      mailOptions.html = html;
+    }
+
+    // Add attachments if provided
+    if (attachments.length > 0) {
+      mailOptions.attachments = attachments;
+    }
+
+    const result = await transporter.sendMail(mailOptions);
 
     return result;
   } catch (error) {

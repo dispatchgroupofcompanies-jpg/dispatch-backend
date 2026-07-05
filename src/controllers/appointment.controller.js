@@ -129,21 +129,26 @@ const updateAppointmentStatus = async (req, res) => {
           console.log("📄 Generating email template...");
           const emailContent = getEmailTemplate(appointment, dateFormatted);
           
+          console.log("📄 Generating appointment PDF...");
+          const pdfPath = await generateAppointmentPDF(appointment);
+          console.log("✅ PDF generated:", pdfPath);
+          
           console.log("📤 Sending email to:", recipientEmail);
           
           const emailResult = await sendInvoiceEmail(
             [recipientEmail],
-            null,
+            pdfPath,
             "Appointment Confirmed",
             emailContent
           );
           
-          console.log("✅ STEP 4: Email sent successfully!");
+          console.log("✅ STEP 4: Email sent successfully with PDF attachment!");
           console.log("📬 Email Details:", {
             to: recipientEmail,
             subject: "Appointment Confirmed",
             messageId: emailResult?.messageId,
-            response: emailResult?.response
+            response: emailResult?.response,
+            pdfAttached: true
           });
         } catch (emailErr) {
           console.error("❌ ERROR: Appointment confirmation email failed to send:");
