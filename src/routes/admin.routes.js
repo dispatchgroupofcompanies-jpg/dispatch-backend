@@ -1,19 +1,12 @@
 const express = require("express");
 const router = express.Router();
-const { 
-  getadminDashboard,
-  getAllInvoices,
-  updateInvoiceStatus,
-  rejectInvoice,
-  getAllApointments
-} = require("../controllers/admin.controller");
-const authMiddleware = require("../middleware/auth.middleware");
 
-router.get("/stats", authMiddleware, getadminDashboard);
+const { resetAdminPassword, getAdminProfile } = require("../controllers/admin.controller");
 
-router.get("/invoices", authMiddleware, getAllInvoices);
-router.patch("/approved/:id/status", authMiddleware, updateInvoiceStatus);
-router.patch("/rejected/:id/status", authMiddleware, rejectInvoice); 
-router.get("/all-appointments", authMiddleware, getAllApointments); 
+// 🔥 ADMIN PASSWORD RESET ROUTE
+router.post("/reset-password", resetAdminPassword);
+
+// 🔥 GET ADMIN PROFILE ROUTE
+router.get("/profile", getAdminProfile);
 
 module.exports = router;

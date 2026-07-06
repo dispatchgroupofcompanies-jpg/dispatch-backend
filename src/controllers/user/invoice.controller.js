@@ -1,11 +1,8 @@
-const Invoice = require("../models/invoice.model");
-const generateInvoiceNumber = require("../services/invoiceNumber.service");
-const calculateInvoice = require("../services/invoiceCalculation.service");
-const path = require("path");
-const generateInvoicePDF = require("../services/pdf.service");
-const sendInvoiceEmail = require("../services/email.service");
+const Invoice = require("../../models/invoice.model");
+const generateInvoicePDF = require("../../services/pdf.service");
 
-const createInvoice = async (req, res) => {
+// User: Create new invoice
+exports.createInvoice = async (req, res) => {
   try {
     const data = req.body;
     if (!data?.trips?.length) {
@@ -16,19 +13,18 @@ const createInvoice = async (req, res) => {
     }
 
     // Invoice calculation utility trigger
+    const calculateInvoice = require("../../services/invoiceCalculation.service");
     const calculated = calculateInvoice(data.trips);
 
-    // STEP: Ensure loadId1, loadId2 and driverName pass safely into the mapped calculated trips array
+    // Ensure loadId1, loadId2 and driverName pass safely into the mapped calculated trips array
     const finalizedTrips = calculated.trips.map((calculatedTrip, index) => {
       const originalTrip = data.trips[index];
       
-      // Agar VRID 'T' se start hota hai, toh input standard uppercase structure clear karega
       const cleanVrid = originalTrip?.vrid ? String(originalTrip.vrid).trim().toUpperCase() : "";
 
       return {
         ...calculatedTrip,
         vrid: cleanVrid,
-        // Passing loadId1, loadId2 and driverName securely if present
         loadId1: cleanVrid.startsWith("T") && originalTrip?.loadId1 
           ? String(originalTrip.loadId1).trim() 
           : originalTrip?.loadId1 || undefined,
@@ -44,6 +40,7 @@ const createInvoice = async (req, res) => {
       };
     });
 
+    const generateInvoiceNumber = require("../../services/invoiceNumber.service");
     const invoiceNumber = await generateInvoiceNumber();    
     const invoicePayload = {
       ...data,
@@ -63,17 +60,15 @@ const createInvoice = async (req, res) => {
       };
     }
 
-    // Yahan Mongoose schema strict dynamically valid validation test pass karega
     const invoice = await Invoice.create(invoicePayload);
 
-    let pdfPath = null;
     try {
-      pdfPath = await generateInvoicePDF(invoice);
+      await generateInvoicePDF(invoice);
       
       invoice.pdfUrl = `/uploads/invoices/invoice-${invoice.invoiceNumber}.pdf`;
       await invoice.save();
     } catch (err) {
-      console.error("❌ STEP 6b: PDF Render Engine Exception encountered:", err.message);
+      console.error("❌ PDF Render Engine Exception encountered:", err.message);
     }
 
     return res.status(201).json({
@@ -85,7 +80,6 @@ const createInvoice = async (req, res) => {
   } catch (error) {
     console.error("🔥 SYSTEM FAILURE INSIDE CREATE INVOICE DISPATCH HOOK:", error);
     
-    // Agar mongoose validation fail hogi (Load ID skip karne par), toh yeh specific error feedback dega
     if (error.name === "ValidationError") {
       return res.status(400).json({
         success: false,
@@ -102,30 +96,35 @@ const createInvoice = async (req, res) => {
   }
 };
 
-// 2. GET ALL INVOICES (user-specific or all for admin)
-const getInvoiceList = async (req, res) => {
+// User: Get own invoices only
+exports.getInvoiceList = async (req, res) => {
   try {
-    console.log("🔍 getInvoiceList - req.user:", req.user ? "exists" : "undefined");
-    console.log("🔍 getInvoiceList - req.accountType:", req.accountType);
-    
-    let query = {};
-    
-    // If user is not admin, filter by createdBy
-    if (req.accountType !== "admin") {
-      const userId = req.user?._id;
-      if (!userId) {
-        return res.status(401).json({ 
-          success: false, 
-          message: "User not authenticated" 
-        });
-      }
-      query.createdBy = userId;
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ 
+        success: false, 
+        message: "User not authenticated" 
+      });
     }
+
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // Only get invoices created by this user
+    const filter = { createdBy: userId };
     
-    const invoices = await Invoice.find(query).sort({ createdAt: -1 });
+    const totalInvoices = await Invoice.countDocuments(filter);
+    const invoices = await Invoice.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
     return res.json({
       success: true,
       total: invoices.length,
+      totalPages: Math.ceil(totalInvoices / limit),
+      currentPage: page,
       data: invoices,
     });
   } catch (error) {
@@ -134,39 +133,48 @@ const getInvoiceList = async (req, res) => {
   }
 };
 
-const getInvoiceById = async (req, res) => {
-  try {
-    const invoice = await Invoice.findById(req.params.id);
-    if (!invoice) {
-      return res.status(404).json({ success: false, message: "Invoice not found." });
-    }
-    
-    // Check if user owns this invoice (admin can access all)
-    if (req.accountType !== "admin" && invoice.createdBy?.toString() !== req.user?._id?.toString()) {
-      return res.status(403).json({ success: false, message: "Access denied. You can only view your own invoices." });
-    }
-    
-    return res.json({ success: true, data: invoice });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-const updateInvoice = async (req, res) => {
+// User: Get invoice by ID (only if it belongs to user)
+exports.getInvoiceById = async (req, res) => {
   try {
     const invoice = await Invoice.findById(req.params.invoiceId);
     if (!invoice) {
       return res.status(404).json({ success: false, message: "Invoice not found." });
     }
 
-    // Check if user owns this invoice (admin can update all)
-    if (req.accountType !== "admin" && invoice.createdBy?.toString() !== req.user?._id?.toString()) {
-      return res.status(403).json({ success: false, message: "Access denied. You can only update your own invoices." });
+    // Check if invoice belongs to user
+    if (invoice.createdBy?.toString() !== req.user?._id?.toString()) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "You don't have permission to access this invoice." 
+      });
+    }
+
+    return res.json({ success: true, data: invoice });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// User: Update own invoice
+exports.updateInvoice = async (req, res) => {
+  try {
+    const invoice = await Invoice.findById(req.params.invoiceId);
+    if (!invoice) {
+      return res.status(404).json({ success: false, message: "Invoice not found." });
+    }
+
+    // Check if invoice belongs to user
+    if (invoice.createdBy?.toString() !== req.user?._id?.toString()) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "You don't have permission to update this invoice." 
+      });
     }
 
     Object.assign(invoice, req.body);
 
     if (req.body.trips) {
+      const calculateInvoice = require("../../services/invoiceCalculation.service");
       const result = calculateInvoice(req.body.trips);
       invoice.trips = result.trips;
       invoice.subtotal = result.subtotal;
@@ -174,7 +182,7 @@ const updateInvoice = async (req, res) => {
       invoice.grandTotal = result.grandTotal;
     }
 
-    // PDF ko regenerate karein agar data update hua ho
+    // Regenerate PDF if data updated
     try {
       await generateInvoicePDF(invoice);
     } catch (pdfErr) {
@@ -192,16 +200,20 @@ const updateInvoice = async (req, res) => {
   }
 };
 
-const deleteInvoice = async (req, res) => {
+// User: Delete own invoice
+exports.deleteInvoice = async (req, res) => {
   try {
     const invoice = await Invoice.findById(req.params.invoiceId);
     if (!invoice) {
       return res.status(404).json({ success: false, message: "Invoice not found." });
     }
 
-    // Check if user owns this invoice (admin can delete all)
-    if (req.accountType !== "admin" && invoice.createdBy?.toString() !== req.user?._id?.toString()) {
-      return res.status(403).json({ success: false, message: "Access denied. You can only delete your own invoices." });
+    // Check if invoice belongs to user
+    if (invoice.createdBy?.toString() !== req.user?._id?.toString()) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "You don't have permission to delete this invoice." 
+      });
     }
 
     await invoice.deleteOne();
@@ -211,16 +223,67 @@ const deleteInvoice = async (req, res) => {
   }
 };
 
-const downloadInvoicePDF = async (req, res) => {
+// User: Update invoice status (for payment status)
+exports.updateInvoiceStatus = async (req, res) => {
+  try {
+    const { invoiceId } = req.params;
+    const { invoiceStatus } = req.body;
+
+    if (!invoiceStatus) {
+      return res.status(400).json({
+        success: false,
+        message: "invoiceStatus field is required in request body.",
+      });
+    }
+
+    const invoice = await Invoice.findById(invoiceId);
+    if (!invoice) {
+      return res.status(404).json({
+        success: false,
+        message: "Invoice not found.",
+      });
+    }
+
+    // Check if invoice belongs to user
+    if (invoice.createdBy?.toString() !== req.user?._id?.toString()) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "You don't have permission to update this invoice." 
+      });
+    }
+
+    const normalizedStatus = invoiceStatus.toLowerCase();
+    invoice.invoiceStatus = normalizedStatus;
+    await invoice.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `Status successfully synchronized to ${normalizedStatus}.`,
+      data: invoice,
+    });
+
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// User: Download invoice PDF
+exports.downloadInvoicePDF = async (req, res) => {
   try {
     const invoice = await Invoice.findById(req.params.invoiceId);
     if (!invoice) {
       return res.status(404).json({ success: false, message: "Invoice not found." });
     }
 
-    // Check if user owns this invoice (admin can access all)
-    if (req.accountType !== "admin" && invoice.createdBy?.toString() !== req.user?._id?.toString()) {
-      return res.status(403).json({ success: false, message: "Access denied. You can only download your own invoices." });
+    // Check if invoice belongs to user
+    if (invoice.createdBy?.toString() !== req.user?._id?.toString()) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "You don't have permission to download this invoice." 
+      });
     }
 
     // Check if PDF exists
@@ -258,86 +321,4 @@ const downloadInvoicePDF = async (req, res) => {
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
-};
-
-const updateInvoiceStatus = async (req, res) => {
-  try {
-    const { invoiceId } = req.params;
-    const { invoiceStatus } = req.body;
-
-    if (!invoiceStatus) {
-      return res.status(400).json({
-        success: false,
-        message: "invoiceStatus field is required in request body.",
-      });
-    }
-
-    const normalizedStatus = invoiceStatus.toLowerCase();
-
-    // Database Object load hook
-    const invoice = await Invoice.findById(invoiceId);
-    if (!invoice) {
-      return res.status(404).json({
-        success: false,
-        message: "Invoice not found.",
-      });
-    }
-
-    // Check if user owns this invoice (admin can update all)
-    if (req.accountType !== "admin" && invoice.createdBy?.toString() !== req.user?._id?.toString()) {
-      return res.status(403).json({ success: false, message: "Access denied. You can only update status of your own invoices." });
-    }
-
-    invoice.invoiceStatus = normalizedStatus;
-    await invoice.save();
-
-    if (normalizedStatus === "paid") {
-      
-      const pdfPath = path.join(__dirname, "../..", invoice.pdfUrl || ""); 
-      const recipientsList = [
-        invoice.customer?.email,
-        invoice.payee?.email,
-        "dispatchgroupofcompanies@gmail.com"
-      ].filter(Boolean);
-
-      if (recipientsList.length > 0) {
-        try {
-          await sendInvoiceEmail(recipientsList, pdfPath, invoice.invoiceNumber);
-          
-          invoice.emailStatus = "sent";
-          invoice.emailSentAt = new Date();
-          await invoice.save();
-        } catch (mailErr) {
-          invoice.emailStatus = "failed";
-          await invoice.save();
-          console.error("❌ Email delivery failed:", mailErr.message);
-        }
-      } else {
-        console.log("⚠️ Email transmission skipped: No recipient list registered.");
-      }
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: `Status successfully synchronized to ${normalizedStatus}.`,
-      data: invoice,
-    });
-
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
-
-// SINGLE CLEAN EXPORT DECLARATION FOR THE MODULE
-module.exports = {
-  createInvoice,
-  getInvoiceList,
-  getInvoiceById,
-  updateInvoice,
-  deleteInvoice,
-  updateInvoiceStatus,
-  downloadInvoicePDF
 };

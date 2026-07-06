@@ -128,6 +128,7 @@ const invoiceSchema = new mongoose.Schema(
     emailSentAt: { type: Date },
 
     notes: String,
+    invoiceDate: { type: Date },
 
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,

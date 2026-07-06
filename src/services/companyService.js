@@ -1,13 +1,9 @@
 const CompanyProfile = require("../models/CompanyProfile.js");
 
 const getCompanyProfileService = async (userId = null, isAdmin = false) => {
-  if (isAdmin) {
-    return await CompanyProfile.find({}); 
-  }
-  if (userId) {
-    return await CompanyProfile.find({ userId }); 
-  }
-  return await CompanyProfile.find({}); 
+  // Return all company profiles to all authenticated users
+  // Company profiles are system-wide and should be visible to everyone
+  return await CompanyProfile.find({});
 };
 
 const saveOrUpdateProfileService = async (profileData, userId = null) => {

@@ -1,13 +1,12 @@
 const mongoose = require("mongoose");
-const Appointment = require("../models/appointment.model");
-const sendInvoiceEmail = require("../services/email.service");
-const generateAppointmentPDF = require("../services/appointment-pdf.service");
+const Appointment = require("../../models/appointment.model");
+const sendInvoiceEmail = require("../../services/email.service");
+const generateAppointmentPDF = require("../../services/appointment-pdf.service");
 
-// Create a new appointment
-const createAppointment = async (req, res) => {
+// User: Create new appointment
+exports.createAppointment = async (req, res) => {
   try {
-    console.log("📝 STEP 1: Creating new appointment...");
-    console.log("📋 Appointment Data:", JSON.stringify(req.body, null, 2));
+    console.log("📝 Creating new appointment...");
     
     // Add userId from authenticated user
     const appointmentData = {
@@ -17,17 +16,6 @@ const createAppointment = async (req, res) => {
     
     const appointment = await Appointment.create(appointmentData);
     
-    console.log("✅ STEP 2: Appointment created successfully in database");
-    console.log("📊 Appointment Details:", {
-      id: appointment._id,
-      carrierName: appointment.carrierName,
-      carrierEmail: appointment.carrierEmail,
-      companyName: appointment.companyName,
-      email: appointment.email,
-      appointmentDate: appointment.appointmentDate,
-      status: appointment.status
-    });
-
     return res.status(201).json({
       success: true,
       message: "Appointment booked successfully!",
@@ -43,30 +31,35 @@ const createAppointment = async (req, res) => {
   }
 };
 
-// Get all appointments (user-specific or all for admin)
-const getAppointments = async (req, res) => {
+// User: Get own appointments only
+exports.getAppointments = async (req, res) => {
   try {
-    console.log("🔍 getAppointments - req.user:", req.user ? "exists" : "undefined");
-    console.log("🔍 getAppointments - req.accountType:", req.accountType);
-    
-    let query = {};
-    
-    // If user is not admin, filter by userId
-    if (req.accountType !== "admin") {
-      const userId = req.user?._id;
-      if (!userId) {
-        return res.status(401).json({ 
-          success: false, 
-          message: "User not authenticated" 
-        });
-      }
-      query.userId = userId;
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ 
+        success: false, 
+        message: "User not authenticated" 
+      });
     }
+
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // Only get appointments created by this user
+    const filter = { userId: userId };
+    const totalAppointments = await Appointment.countDocuments(filter);
     
-    const appointments = await Appointment.find(query).sort({ createdAt: -1 });
+    const appointments = await Appointment.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
     return res.json({
       success: true,
       total: appointments.length,
+      totalPages: Math.ceil(totalAppointments / limit),
+      currentPage: page,
       data: appointments,
     });
   } catch (error) {
@@ -75,31 +68,62 @@ const getAppointments = async (req, res) => {
   }
 };
 
-// Get appointment by ID
-const getAppointmentById = async (req, res) => {
+// User: Get appointment by ID (only if it belongs to user)
+exports.getAppointmentById = async (req, res) => {
   try {
     const appointment = await Appointment.findById(req.params.id);
     if (!appointment) {
       return res.status(404).json({ success: false, message: "Appointment not found." });
     }
-    
-    // Check if user owns this appointment (admin can access all)
-    if (req.accountType !== "admin" && appointment.userId?.toString() !== req.user?._id?.toString()) {
-      return res.status(403).json({ success: false, message: "Access denied. You can only view your own appointments." });
+
+    // Check if appointment belongs to user
+    if (appointment.userId?.toString() !== req.user?._id?.toString()) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "You don't have permission to access this appointment." 
+      });
     }
-    
+
     return res.json({ success: true, data: appointment });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// Update Appointment Status and Send Notification
-const updateAppointmentStatus = async (req, res) => {
+// User: Update own appointment
+exports.updateAppointment = async (req, res) => {
+  try {
+    const appointment = await Appointment.findById(req.params.id);
+    if (!appointment) {
+      return res.status(404).json({ success: false, message: "Appointment not found." });
+    }
+
+    // Check if appointment belongs to user
+    if (appointment.userId?.toString() !== req.user?._id?.toString()) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "You don't have permission to update this appointment." 
+      });
+    }
+
+    Object.assign(appointment, req.body);
+    await appointment.save();
+
+    return res.json({ 
+      success: true, 
+      message: "Appointment updated successfully!", 
+      data: appointment 
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// User: Update appointment status
+exports.updateAppointmentStatus = async (req, res) => {
   try {
     const { appointmentId } = req.params;
     const { status } = req.body; 
-    console.log('data', req.body);
 
     if (!status) {
       return res.status(400).json({
@@ -108,7 +132,6 @@ const updateAppointmentStatus = async (req, res) => {
       });
     }
 
-    // Prevent server crash if malformed Mongo ID is provided
     if (!mongoose.Types.ObjectId.isValid(appointmentId)) {
       return res.status(400).json({
         success: false,
@@ -124,37 +147,28 @@ const updateAppointmentStatus = async (req, res) => {
       });
     }
 
-    // Check if user owns this appointment (admin can update all)
-    if (req.accountType !== "admin" && appointment.userId?.toString() !== req.user?._id?.toString()) {
-      return res.status(403).json({ success: false, message: "Access denied. You can only update your own appointments." });
+    // Check if appointment belongs to user
+    if (appointment.userId?.toString() !== req.user?._id?.toString()) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "You don't have permission to update this appointment." 
+      });
     }
 
     appointment.status = status.toLowerCase();
     await appointment.save();
-    
-    console.log(`✅ STEP 2: Appointment status updated to '${status}' in database`);
-    console.log("📊 Updated Appointment:", {
-      id: appointment._id,
-      carrierName: appointment.carrierName,
-      carrierEmail: appointment.carrierEmail,
-      companyName: appointment.companyName,
-      email: appointment.email,
-      status: appointment.status
-    });
 
     // Send email only when status is confirmed
     if (status.toLowerCase() === "confirmed") {
-      console.log("📧 STEP 3: Attempting to send confirmation email...");
-      
-      // Guard clause: Only trigger email if recipient field actually exists
       const recipientEmail = appointment.carrierEmail || appointment.email;
       
+      console.log(`📧 Appointment ${appointment._id} status changed to: ${status}`);
+      console.log(`📧 Recipient email: ${recipientEmail}`);
+      
       if (!recipientEmail) {
-        const warningMsg = `⚠️ WARNING: Appointment ${appointment._id} confirmed, but has no email address. Skipping notification.`;
-        console.warn(warningMsg);
+        console.warn(`⚠️ WARNING: Appointment ${appointment._id} confirmed, but has no email address.`);
       } else {
         try {
-          // Format primary appointment date with clean fallback safety
           const dateFormatted = appointment.appointmentDate 
             ? new Date(appointment.appointmentDate).toLocaleDateString("en-CA", {
                 year: "numeric",
@@ -163,7 +177,6 @@ const updateAppointmentStatus = async (req, res) => {
               }) 
             : "N/A";
 
-          // Format routing schedule dates for the invoice presentation tables
           const pickupDateOpt = appointment.pickupDate 
             ? new Date(appointment.pickupDate).toLocaleDateString("en-CA", {
                 year: "numeric",
@@ -180,17 +193,14 @@ const updateAppointmentStatus = async (req, res) => {
               }) 
             : "N/A";
 
-          console.log("📄 Generating email template...");
+          console.log(`📧 Generating PDF for appointment: ${appointment._id}`);
           const emailContent = getEmailTemplate(appointment, dateFormatted, pickupDateOpt, deliveryDateOpt);
+          const pdfPath = await generateAppointmentPDF(appointment, emailContent);
           
-          console.log("📄 Generating appointment PDF...");
-          // Pass formatted variables or handle layout sync inside the PDF script
-          const pdfPath = await generateAppointmentPDF(appointment);
-          console.log("✅ PDF generated:", pdfPath);
+          console.log(`📧 PDF generated at: ${pdfPath}`);
+          console.log(`📧 Sending email to: ${recipientEmail}`);
           
-          console.log("📤 Sending email to:", recipientEmail);
-          
-          const emailResult = await sendInvoiceEmail(
+          await sendInvoiceEmail(
             [recipientEmail],
             pdfPath,
             "Appointment Confirmed", 
@@ -198,37 +208,22 @@ const updateAppointmentStatus = async (req, res) => {
             emailContent 
           );
           
-          console.log("✅ STEP 4: Email sent successfully with PDF attachment!");
-          console.log("📬 Email Details:", {
-            to: recipientEmail,
-            subject: "Appointment Confirmed",
-            messageId: emailResult?.messageId,
-            response: emailResult?.response,
-            pdfAttached: true
-          });
+          console.log(`✅ Appointment confirmation email sent successfully for: ${appointment._id}`);
         } catch (emailErr) {
-          console.error("❌ ERROR: Appointment confirmation email failed to send:");
-          console.error("📧 Email Error Details:", {
-            error: emailErr.message,
-            code: emailErr.code,
-            to: recipientEmail,
-            subject: "Appointment Confirmed"
-          });
+          console.error("❌ ERROR: Appointment confirmation email failed:", emailErr);
+          console.error("Error details:", emailErr.message);
+          if (emailErr.code) console.error("Error code:", emailErr.code);
         }
       }
-    } else {
-      console.log(`ℹ️ Status is '${status}', not sending confirmation email (only sends for 'confirmed')`);
     }
 
-    console.log("✅ STEP 5: Status update completed successfully");
-    
     return res.status(200).json({
       success: true,
       message: `Appointment status updated to ${status}.`,
       data: appointment,
     });
   } catch (error) {
-    console.error("Error in updateAppointmentStatus handling:", error);
+    console.error("Error in updateAppointmentStatus:", error);
     return res.status(500).json({
       success: false,
       message: "Internal server error occurred.",
@@ -237,42 +232,20 @@ const updateAppointmentStatus = async (req, res) => {
   }
 };
 
-// Update appointment
-const updateAppointment = async (req, res) => {
-  try {
-    const appointment = await Appointment.findById(req.params.id);
-    if (!appointment) {
-      return res.status(404).json({ success: false, message: "Appointment not found." });
-    }
-
-    // Check if user owns this appointment (admin can update all)
-    if (req.accountType !== "admin" && appointment.userId?.toString() !== req.user?._id?.toString()) {
-      return res.status(403).json({ success: false, message: "Access denied. You can only update your own appointments." });
-    }
-
-    const updatedAppointment = await Appointment.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true, runValidators: true }
-    );
-    
-    return res.json({ success: true, message: "Appointment updated successfully!", data: updatedAppointment });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// Delete appointment
-const deleteAppointment = async (req, res) => {
+// User: Delete own appointment
+exports.deleteAppointment = async (req, res) => {
   try {
     const appointment = await Appointment.findById(req.params.appointmentId);
     if (!appointment) {
       return res.status(404).json({ success: false, message: "Appointment not found." });
     }
 
-    // Check if user owns this appointment (admin can delete all)
-    if (req.accountType !== "admin" && appointment.userId?.toString() !== req.user?._id?.toString()) {
-      return res.status(403).json({ success: false, message: "Access denied. You can only delete your own appointments." });
+    // Check if appointment belongs to user
+    if (appointment.userId?.toString() !== req.user?._id?.toString()) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "You don't have permission to delete this appointment." 
+      });
     }
 
     await appointment.deleteOne();
@@ -282,20 +255,22 @@ const deleteAppointment = async (req, res) => {
   }
 };
 
-// Download appointment PDF
-const downloadAppointmentPDF = async (req, res) => {
+// User: Download appointment PDF
+exports.downloadAppointmentPDF = async (req, res) => {
   try {
     const appointment = await Appointment.findById(req.params.id);
     if (!appointment) {
       return res.status(404).json({ success: false, message: "Appointment not found." });
     }
 
-    // Check if user owns this appointment (admin can access all)
-    if (req.accountType !== "admin" && appointment.userId?.toString() !== req.user?._id?.toString()) {
-      return res.status(403).json({ success: false, message: "Access denied. You can only download your own appointments." });
+    // Check if appointment belongs to user
+    if (appointment.userId?.toString() !== req.user?._id?.toString()) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "You don't have permission to download this appointment." 
+      });
     }
 
-    // Clear string fallbacks to prevent "Invalid Date" strings in the PDF generation
     const dateFormatted = appointment.appointmentDate 
       ? new Date(appointment.appointmentDate).toLocaleDateString("en-CA", { year: "numeric", month: "long", day: "numeric" }) 
       : "N/A";
@@ -308,10 +283,7 @@ const downloadAppointmentPDF = async (req, res) => {
       ? new Date(appointment.deliveryDate).toLocaleDateString("en-CA", { year: "numeric", month: "long", day: "numeric" }) 
       : "N/A";
 
-    // Generate HTML layout context block matching email format engine
     const fullHtmlLayout = getEmailTemplate(appointment, dateFormatted, pickupDateOpt, deliveryDateOpt);
-
-    // Pass the built layout configuration object or custom HTML text down to the service engine
     const filePath = await generateAppointmentPDF(appointment, fullHtmlLayout);
     
     res.download(filePath, `appointment-${appointment._id}.pdf`, (err) => {
@@ -328,7 +300,7 @@ const downloadAppointmentPDF = async (req, res) => {
   }
 };
 
-// Helper HTML template function to clean up core logic
+// Helper HTML template function
 const getEmailTemplate = (appointment, dateFormatted, pickupDateOpt, deliveryDateOpt) => {
   const getValue = (value, fallback = "N/A") => value || fallback;
 
@@ -385,7 +357,7 @@ const getEmailTemplate = (appointment, dateFormatted, pickupDateOpt, deliveryDat
 
           <tr>
             <td style="padding: 35px;">
-              
+               
               <h2 style="margin: 0 0 12px 0; font-size: 14px; text-transform: uppercase; color: #0f172a; border-bottom: 2px solid #cbd5e1; padding-bottom: 5px; letter-spacing: 0.5px;">Carrier & Equipment Information</h2>
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 30px;">
                 <tr>
@@ -586,14 +558,4 @@ const getEmailTemplate = (appointment, dateFormatted, pickupDateOpt, deliveryDat
 </body>
 </html>
   `;
-};
-
-module.exports = {
-  createAppointment,
-  getAppointments,
-  getAppointmentById,
-  updateAppointmentStatus,
-  updateAppointment,
-  deleteAppointment,
-  downloadAppointmentPDF,
 };

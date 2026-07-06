@@ -20,7 +20,7 @@ const userSchema = new mongoose.Schema(
     },
     address: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
     },
     // 👈 NEW ROLE FIELD ADDED WITH DEFAULT VALUE
@@ -28,6 +28,10 @@ const userSchema = new mongoose.Schema(
       type: String,
       enum: ["user", "admin"], 
       default: "user", 
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
     },
   },
   { timestamps: true }

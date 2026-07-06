@@ -46,11 +46,24 @@ const authMiddleware = async (req, res, next) => {
     }
 
     // 4. Validate account status
-    if (!account || account.isActive === false) {
+    if (!account) {
       return res.status(401).json({
         success: false,
-        message: "Authorization failed. Account is invalid or deactivated.",
+        message: "Authorization failed. Account not found.",
       });
+    }
+
+    // Check if account is active (handle missing isActive field for backward compatibility)
+    if (account.isActive === false) {
+      return res.status(401).json({
+        success: false,
+        message: "Authorization failed. Account is deactivated.",
+      });
+    }
+
+    // Determine actual account type based on role field
+    if (account.role === "admin") {
+      accountType = "admin";
     }
 
     // 5. Attach the authenticated entity to the request object

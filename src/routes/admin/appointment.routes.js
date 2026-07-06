@@ -1,22 +1,18 @@
 const express = require("express");
 const router = express.Router();
-const Appointment = require("../models/appointment.model");
+
 const {
-  createAppointment,
   getAppointments,
   getAppointmentById,
   updateAppointmentStatus,
-  updateAppointment,
   deleteAppointment,
   downloadAppointmentPDF,
-} = require("../controllers/appointment.controller");
-const authenticate = require("../middleware/auth.middleware");
+} = require("../../controllers/admin/appointment.controller.js");
 
-// All routes require authentication
+const authenticate = require("../../middleware/auth.middleware.js");
+
+// All admin appointment routes require authentication
 router.use(authenticate);
-
-// Create new appointment
-router.post("/", createAppointment);
 
 // Get all appointments
 router.get("/", getAppointments);
@@ -25,14 +21,11 @@ router.get("/", getAppointments);
 router.get("/:id", getAppointmentById);
 
 router.patch("/:appointmentId/status", updateAppointmentStatus);
+
 // Delete appointment
 router.delete("/:appointmentId", deleteAppointment);
 
-// Update appointment
-router.put("/:id", updateAppointment);
-
 // Download appointment PDF
 router.get("/:id/download", downloadAppointmentPDF);
-
 
 module.exports = router;
