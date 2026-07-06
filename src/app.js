@@ -34,14 +34,15 @@ const allowedOrigins = process.env.FRONTEND_URL
   ? process.env.FRONTEND_URL.split(',').map(url => url.trim()).filter(url => url)
   : ["http://localhost:3000"];
 
-console.log('🔒 CORS Configuration Loaded');
-console.log('✅ Allowed Origins:', allowedOrigins);
+console.log("🔒 CORS Configuration Loaded");
+console.log("FRONTEND_URL =", process.env.FRONTEND_URL);
+console.log("Allowed Origins =", allowedOrigins);
 
 app.use(cors({
   origin: function(origin, callback) {
     // Allow requests with no origin (like mobile apps, curl, etc.)
     if (!origin) {
-      console.log('✅ CORS Allowed: Request with no origin (mobile/curl)');
+      console.log("✅ CORS Allowed: Request with no origin (mobile/curl)");
       return callback(null, true);
     }
     
@@ -52,25 +53,14 @@ app.use(cors({
       callback(null, true);
     } else {
       console.log(`❌ CORS Blocked: ${origin}`);
-      console.log(`   Allowed origins: ${allowedOrigins.join(', ')}`);
-      callback(new Error('Not allowed by CORS'));
+      console.log(`   Allowed origins: ${allowedOrigins.join(", ")}`);
+      callback(new Error("Not allowed by CORS"));
     }
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
 }));
-
-app.use((req, res, next) => {
-  if (req.method === "OPTIONS") {
-    res.header("Access-Control-Allow-Origin", "*");
-    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
-    res.header("Access-Control-Allow-Headers", "Content-Type", "Authorization");
-    res.header("Access-Control-Allow-Credentials", "true");
-    return res.sendStatus(200);
-  }
-  next();
-});
 
 // 4. PARSING MIDDLEWARES
 app.use(express.json());
