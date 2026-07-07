@@ -4,9 +4,6 @@ exports.createUser = async (req, res) => {
   try {
     const { name, email, password, address } = req.body;
     
-    console.log("Received request body:", req.body);
-    console.log("Extracted fields:", { name, email, password, address });
-    
     if (!name || !email || !password || !address) {
       return res.status(400).json({ 
         success: false, 
@@ -17,7 +14,6 @@ exports.createUser = async (req, res) => {
 
     // Always set role as "user" when creating new user from admin panel
     const user = await userService.createUser({ name, email, password, address, role: "user" });
-    console.log("User created successfully:", user);
     return res.status(201).json({
       success: true,
       message: "User registered successfully",

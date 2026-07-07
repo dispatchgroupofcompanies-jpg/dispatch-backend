@@ -2,7 +2,7 @@ const Admin = require("../models/user.model");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
-// 🔥 RESET ADMIN PASSWORD
+// 🔥 RESET ADMIN PASSWORD (FIXED)
 exports.resetAdminPassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
@@ -34,6 +34,7 @@ exports.resetAdminPassword = async (req, res) => {
 
     // Verify token and get admin ID
     const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
+    console.log("🔑 JWT_SECRET:", JWT_SECRET); // Debugging line to check the secret
     let decoded;
     try {
       decoded = jwt.verify(token, JWT_SECRET);
@@ -69,10 +70,7 @@ exports.resetAdminPassword = async (req, res) => {
     }
 
     // Verify current password
-    // First check if it's the hardcoded password
     const isHardcodedPassword = currentPassword === "111111";
-    
-    // Then check if it matches the hashed password in database
     const isPasswordMatch = isHardcodedPassword || await bcrypt.compare(currentPassword, admin.password);
 
     if (!isPasswordMatch) {
@@ -82,15 +80,12 @@ exports.resetAdminPassword = async (req, res) => {
       });
     }
 
-    // Hash new password
-    const salt = await bcrypt.genSalt(10);
-    const hashedNewPassword = await bcrypt.hash(newPassword, salt);
-
-    // Update password in database
-    admin.password = hashedNewPassword;
+    // FIX: Manual bcrypt hashing yahan se hata di hai.
+    // Plain text set karke direct .save() chalayein taaki schema hook single hashing kare.
+    admin.password = newPassword;
     await admin.save();
 
-    console.log("✅ Admin password reset successful for:", admin.email);
+    console.log("✅ Admin password reset successful (Single hash saved) for:", admin.email);
 
     return res.json({
       success: true,
@@ -105,7 +100,6 @@ exports.resetAdminPassword = async (req, res) => {
     });
   }
 };
-
 // 🔥 GET ADMIN PROFILE
 exports.getAdminProfile = async (req, res) => {
   try {

@@ -3,6 +3,7 @@ const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const morgan = require("morgan");
 const path = require("path");
+const { apiLimiter } = require("./middleware/rateLimiter");
 
 const authRoutes = require("./routes/auth.routes");
 const connectDB = require("./config/db");
@@ -20,7 +21,7 @@ const userInvoiceRoutes = require("./routes/user/invoice.routes");
 const userAppointmentRoutes = require("./routes/user/appointment.routes");
 const userDashboardRoutes = require("./routes/user/dashboard.routes");
 
-
+// Legacy Routes
 const legacyInvoiceRoutes = require("./routes/invoice.routes");
 const legacyAppointmentRoutes = require("./routes/appointment.routes");
 
@@ -34,26 +35,18 @@ const allowedOrigins = process.env.FRONTEND_URL
   ? process.env.FRONTEND_URL.split(',').map(url => url.trim()).filter(url => url)
   : ["http://localhost:3000"];
 
-console.log("🔒 CORS Configuration Loaded");
-console.log("FRONTEND_URL =", process.env.FRONTEND_URL);
-console.log("Allowed Origins =", allowedOrigins);
-
 app.use(cors({
   origin: function(origin, callback) {
     // Allow requests with no origin (like mobile apps, curl, etc.)
     if (!origin) {
-      console.log("✅ CORS Allowed: Request with no origin (mobile/curl)");
       return callback(null, true);
     }
     
     const isAllowed = allowedOrigins.indexOf(origin) !== -1;
     
     if (isAllowed) {
-      console.log(`✅ CORS Allowed: ${origin}`);
       callback(null, true);
     } else {
-      console.log(`❌ CORS Blocked: ${origin}`);
-      console.log(`   Allowed origins: ${allowedOrigins.join(", ")}`);
       callback(new Error("Not allowed by CORS"));
     }
   },
@@ -66,6 +59,9 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 app.use(morgan("dev"));
+
+// Apply general API rate limiting
+// app.use("/api", apiLimiter);
 
 // 4.5 STATIC FILE SERVING FOR UPLOADS
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));

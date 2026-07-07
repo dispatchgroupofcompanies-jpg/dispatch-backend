@@ -17,10 +17,7 @@ async function fixAdmin() {
       process.exit(1);
     }
 
-    console.log('📝 Found admin user:', admin._id);
-    console.log('Current address:', admin.address);
-    console.log('Current role:', admin.role);
-    console.log('Current isActive:', admin.isActive);
+  
 
     // Update using MongoDB driver directly to bypass Mongoose validation
     const collection = User.collection;

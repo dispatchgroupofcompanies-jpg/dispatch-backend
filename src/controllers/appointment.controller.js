@@ -6,8 +6,7 @@ const generateAppointmentPDF = require("../services/appointment-pdf.service");
 // Create a new appointment
 const createAppointment = async (req, res) => {
   try {
-    console.log("📝 STEP 1: Creating new appointment...");
-    console.log("📋 Appointment Data:", JSON.stringify(req.body, null, 2));
+
     
     // Add userId from authenticated user
     const appointmentData = {
@@ -16,17 +15,7 @@ const createAppointment = async (req, res) => {
     };
     
     const appointment = await Appointment.create(appointmentData);
-    
-    console.log("✅ STEP 2: Appointment created successfully in database");
-    console.log("📊 Appointment Details:", {
-      id: appointment._id,
-      carrierName: appointment.carrierName,
-      carrierEmail: appointment.carrierEmail,
-      companyName: appointment.companyName,
-      email: appointment.email,
-      appointmentDate: appointment.appointmentDate,
-      status: appointment.status
-    });
+
 
     return res.status(201).json({
       success: true,
@@ -99,7 +88,6 @@ const updateAppointmentStatus = async (req, res) => {
   try {
     const { appointmentId } = req.params;
     const { status } = req.body; 
-    console.log('data', req.body);
 
     if (!status) {
       return res.status(400).json({
@@ -132,15 +120,7 @@ const updateAppointmentStatus = async (req, res) => {
     appointment.status = status.toLowerCase();
     await appointment.save();
     
-    console.log(`✅ STEP 2: Appointment status updated to '${status}' in database`);
-    console.log("📊 Updated Appointment:", {
-      id: appointment._id,
-      carrierName: appointment.carrierName,
-      carrierEmail: appointment.carrierEmail,
-      companyName: appointment.companyName,
-      email: appointment.email,
-      status: appointment.status
-    });
+  
 
     // Send email only when status is confirmed
     if (status.toLowerCase() === "confirmed") {

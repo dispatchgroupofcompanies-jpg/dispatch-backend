@@ -8,7 +8,6 @@ const authMiddleware = async (req, res, next) => {
   try {
     // 1. Extract token from header
     const token = req.header("Authorization")?.replace("Bearer ", "");
-    console.log("Extracted Token:", token); 
 
     if (!token) {
       return res.status(401).json({

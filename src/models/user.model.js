@@ -23,7 +23,6 @@ const userSchema = new mongoose.Schema(
       required: false,
       trim: true,
     },
-    // 👈 NEW ROLE FIELD ADDED WITH DEFAULT VALUE
     role: {
       type: String,
       enum: ["user", "admin"], 
