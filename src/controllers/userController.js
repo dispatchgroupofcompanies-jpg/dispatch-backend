@@ -15,7 +15,9 @@ exports.createUser = async (req, res) => {
       });
     }
 
-    const user = await userService.createUser({ name, email, password, address });
+    // Always set role as "user" when creating new user from admin panel
+    const user = await userService.createUser({ name, email, password, address, role: "user" });
+    console.log("User created successfully:", user);
     return res.status(201).json({
       success: true,
       message: "User registered successfully",

@@ -57,13 +57,14 @@ exports.login = async (req, res) => {
       sameSite: "lax",
     });
 
-    console.log("✅ Admin logged in:", admin.email);
+    console.log("✅ User logged in:", admin.email, "Role:", admin.role);
 
-    return res.json({
+    // Return response based on user role
+    const responseData = {
       success: true,
       message: "Login successful",
       token,
-      admin: {
+      user: {
         id: admin._id,
         name: admin.name,
         email: admin.email,
@@ -71,7 +72,14 @@ exports.login = async (req, res) => {
         address: admin.address,
         isActive: admin.isActive,
       },
-    });
+    };
+
+    // Also include admin field if role is admin (for backward compatibility)
+    if (admin.role === "admin") {
+      responseData.admin = responseData.user;
+    }
+
+    return res.json(responseData);
   } catch (error) {
     console.error("Login error:", error);
     return res.status(500).json({

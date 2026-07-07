@@ -20,7 +20,7 @@ const userInvoiceRoutes = require("./routes/user/invoice.routes");
 const userAppointmentRoutes = require("./routes/user/appointment.routes");
 const userDashboardRoutes = require("./routes/user/dashboard.routes");
 
-// Legacy Routes (to be removed after migration)
+
 const legacyInvoiceRoutes = require("./routes/invoice.routes");
 const legacyAppointmentRoutes = require("./routes/appointment.routes");
 
