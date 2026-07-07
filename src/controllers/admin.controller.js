@@ -2,7 +2,6 @@ const Admin = require("../models/user.model");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
-// 🔥 RESET ADMIN PASSWORD (FIXED)
 exports.resetAdminPassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
@@ -34,7 +33,6 @@ exports.resetAdminPassword = async (req, res) => {
 
     // Verify token and get admin ID
     const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
-    console.log("🔑 JWT_SECRET:", JWT_SECRET); // Debugging line to check the secret
     let decoded;
     try {
       decoded = jwt.verify(token, JWT_SECRET);

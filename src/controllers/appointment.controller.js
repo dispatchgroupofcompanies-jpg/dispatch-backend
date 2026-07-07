@@ -120,84 +120,78 @@ const updateAppointmentStatus = async (req, res) => {
     appointment.status = status.toLowerCase();
     await appointment.save();
     
-  
-
-    // Send email only when status is confirmed
-    if (status.toLowerCase() === "confirmed") {
-      console.log("📧 STEP 3: Attempting to send confirmation email...");
-      
-      // Guard clause: Only trigger email if recipient field actually exists
-      const recipientEmail = appointment.carrierEmail || appointment.email;
-      
-      if (!recipientEmail) {
-        const warningMsg = `⚠️ WARNING: Appointment ${appointment._id} confirmed, but has no email address. Skipping notification.`;
-        console.warn(warningMsg);
-      } else {
-        try {
-          // Format primary appointment date with clean fallback safety
-          const dateFormatted = appointment.appointmentDate 
-            ? new Date(appointment.appointmentDate).toLocaleDateString("en-CA", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              }) 
-            : "N/A";
-
-          // Format routing schedule dates for the invoice presentation tables
-          const pickupDateOpt = appointment.pickupDate 
-            ? new Date(appointment.pickupDate).toLocaleDateString("en-CA", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              }) 
-            : "N/A";
-
-          const deliveryDateOpt = appointment.deliveryDate 
-            ? new Date(appointment.deliveryDate).toLocaleDateString("en-CA", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              }) 
-            : "N/A";
-
-          console.log("📄 Generating email template...");
-          const emailContent = getEmailTemplate(appointment, dateFormatted, pickupDateOpt, deliveryDateOpt);
-          
-          console.log("📄 Generating appointment PDF...");
-          // Pass formatted variables or handle layout sync inside the PDF script
-          const pdfPath = await generateAppointmentPDF(appointment);
-          console.log("✅ PDF generated:", pdfPath);
-          
-          console.log("📤 Sending email to:", recipientEmail);
-          
-          const emailResult = await sendInvoiceEmail(
-            [recipientEmail],
-            pdfPath,
-            "Appointment Confirmed", 
-            "Appointment Confirmed", 
-            emailContent 
-          );
-          
-          console.log("✅ STEP 4: Email sent successfully with PDF attachment!");
-          console.log("📬 Email Details:", {
-            to: recipientEmail,
-            subject: "Appointment Confirmed",
-            messageId: emailResult?.messageId,
-            response: emailResult?.response,
-            pdfAttached: true
-          });
-        } catch (emailErr) {
-          console.error("❌ ERROR: Appointment confirmation email failed to send:");
-          console.error("📧 Email Error Details:", {
-            error: emailErr.message,
-            code: emailErr.code,
-            to: recipientEmail,
-            subject: "Appointment Confirmed"
-          });
-        }
-      }
+    // Send email notification on any status change
+    console.log(`📧 STEP 3: Attempting to send status update email for status: ${status}...`);
+    
+    // Guard clause: Only trigger email if recipient field actually exists
+    const recipientEmail = appointment.carrierEmail || appointment.email;
+    
+    if (!recipientEmail) {
+      const warningMsg = `⚠️ WARNING: Appointment ${appointment._id} status changed to ${status}, but has no email address. Skipping notification.`;
+      console.warn(warningMsg);
     } else {
-      console.log(`ℹ️ Status is '${status}', not sending confirmation email (only sends for 'confirmed')`);
+      try {
+        // Format primary appointment date with clean fallback safety
+        const dateFormatted = appointment.appointmentDate 
+          ? new Date(appointment.appointmentDate).toLocaleDateString("en-CA", {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            }) 
+          : "N/A";
+
+        // Format routing schedule dates for the invoice presentation tables
+        const pickupDateOpt = appointment.pickupDate 
+          ? new Date(appointment.pickupDate).toLocaleDateString("en-CA", {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            }) 
+          : "N/A";
+
+        const deliveryDateOpt = appointment.deliveryDate 
+          ? new Date(appointment.deliveryDate).toLocaleDateString("en-CA", {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            }) 
+          : "N/A";
+
+        console.log("📄 Generating email template...");
+        const emailContent = getEmailTemplate(appointment, dateFormatted, pickupDateOpt, deliveryDateOpt);
+        
+        console.log("📄 Generating appointment PDF...");
+        // Pass formatted variables or handle layout sync inside the PDF script
+        const pdfPath = await generateAppointmentPDF(appointment);
+        console.log("✅ PDF generated:", pdfPath);
+        
+        console.log("📤 Sending email to:", recipientEmail);
+        
+        const emailResult = await sendInvoiceEmail(
+          [recipientEmail],
+          pdfPath,
+          `Appointment Status Update - ${status.charAt(0).toUpperCase() + status.slice(1)}`, 
+          `Appointment Status Update - ${status.charAt(0).toUpperCase() + status.slice(1)}`, 
+          emailContent 
+        );
+        
+        console.log(`✅ STEP 4: Email sent successfully for status: ${status}`);
+        console.log("📬 Email Details:", {
+          to: recipientEmail,
+          subject: `Appointment Status Update - ${status.charAt(0).toUpperCase() + status.slice(1)}`,
+          messageId: emailResult?.messageId,
+          response: emailResult?.response,
+          pdfAttached: true
+        });
+      } catch (emailErr) {
+        console.error(`❌ ERROR: Appointment status update email failed to send for status: ${status}`);
+        console.error("📧 Email Error Details:", {
+          error: emailErr.message,
+          code: emailErr.code,
+          to: recipientEmail,
+          subject: `Appointment Status Update - ${status.charAt(0).toUpperCase() + status.slice(1)}`
+        });
+      }
     }
 
     console.log("✅ STEP 5: Status update completed successfully");

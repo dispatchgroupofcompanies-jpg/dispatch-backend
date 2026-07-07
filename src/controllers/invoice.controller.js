@@ -5,6 +5,7 @@ const path = require("path");
 const generateInvoicePDF = require("../services/pdf.service");
 const sendInvoiceEmail = require("../services/email.service");
 
+// 1. CREATE INVOICE WITH AUTOMATIC CUSTOMER FALLBACK
 const createInvoice = async (req, res) => {
   try {
     const data = req.body;
@@ -45,8 +46,28 @@ const createInvoice = async (req, res) => {
     });
 
     const invoiceNumber = await generateInvoiceNumber();    
+    
+    // 💡 FIX: Handling customer fallback data if frontend payload didn't send any
+    let customerData = data.customer;
+    if (!customerData && req.user) {
+      customerData = {
+        customerName: req.user.name || "N/A",
+        companyName: req.user.companyName || "N/A",
+        email: req.user.email || "N/A",
+        phone: req.user.phone || "N/A",
+        address1: req.user.address || "N/A",
+        eTransfer: data.eTransfer || "N/A"
+      };
+    }
+
+    // Log the incoming data for debugging
+    console.log("📧 INVOICE CREATE - Incoming data:", JSON.stringify(data, null, 2));
+    console.log("📧 INVOICE CREATE - Resolved Customer data:", JSON.stringify(customerData, null, 2));
+    console.log("📧 INVOICE CREATE - Payee data:", JSON.stringify(data.payee, null, 2));
+    
     const invoicePayload = {
       ...data,
+      customer: customerData, // 👈 Ensures customer sub-document is always written to DB
       invoiceNumber,
       trips: finalizedTrips,
       subtotal: calculated.subtotal,
@@ -65,13 +86,20 @@ const createInvoice = async (req, res) => {
 
     // Yahan Mongoose schema strict dynamically valid validation test pass karega
     const invoice = await Invoice.create(invoicePayload);
+    
+    // Log the saved invoice to verify data
+    console.log("✅ INVOICE CREATED - Saved to database:", JSON.stringify(invoice.toObject(), null, 2));
+    console.log("✅ INVOICE CREATED - Customer:", JSON.stringify(invoice.customer, null, 2));
+    console.log("✅ INVOICE CREATED - Payee:", JSON.stringify(invoice.payee, null, 2));
 
     let pdfPath = null;
     try {
+      console.log("📄 Generating PDF with invoice data...");
       pdfPath = await generateInvoicePDF(invoice);
       
       invoice.pdfUrl = `/uploads/invoices/invoice-${invoice.invoiceNumber}.pdf`;
       await invoice.save();
+      console.log("✅ PDF generated and URL saved:", pdfPath);
     } catch (err) {
       console.error("❌ STEP 6b: PDF Render Engine Exception encountered:", err.message);
     }
@@ -85,7 +113,6 @@ const createInvoice = async (req, res) => {
   } catch (error) {
     console.error("🔥 SYSTEM FAILURE INSIDE CREATE INVOICE DISPATCH HOOK:", error);
     
-    // Agar mongoose validation fail hogi (Load ID skip karne par), toh yeh specific error feedback dega
     if (error.name === "ValidationError") {
       return res.status(400).json({
         success: false,
@@ -102,7 +129,7 @@ const createInvoice = async (req, res) => {
   }
 };
 
-// 2. GET ALL INVOICES (user-specific or all for admin)
+// 2. GET ALL INVOICES
 const getInvoiceList = async (req, res) => {
   try {
     console.log("🔍 getInvoiceList - req.user:", req.user ? "exists" : "undefined");
@@ -110,7 +137,6 @@ const getInvoiceList = async (req, res) => {
     
     let query = {};
     
-    // If user is not admin, filter by createdBy
     if (req.accountType !== "admin") {
       const userId = req.user?._id;
       if (!userId) {
@@ -134,6 +160,7 @@ const getInvoiceList = async (req, res) => {
   }
 };
 
+// 3. GET INVOICE BY ID
 const getInvoiceById = async (req, res) => {
   try {
     const invoice = await Invoice.findById(req.params.id);
@@ -141,7 +168,6 @@ const getInvoiceById = async (req, res) => {
       return res.status(404).json({ success: false, message: "Invoice not found." });
     }
     
-    // Check if user owns this invoice (admin can access all)
     if (req.accountType !== "admin" && invoice.createdBy?.toString() !== req.user?._id?.toString()) {
       return res.status(403).json({ success: false, message: "Access denied. You can only view your own invoices." });
     }
@@ -152,6 +178,7 @@ const getInvoiceById = async (req, res) => {
   }
 };
 
+// 4. UPDATE INVOICE
 const updateInvoice = async (req, res) => {
   try {
     const invoice = await Invoice.findById(req.params.invoiceId);
@@ -159,7 +186,6 @@ const updateInvoice = async (req, res) => {
       return res.status(404).json({ success: false, message: "Invoice not found." });
     }
 
-    // Check if user owns this invoice (admin can update all)
     if (req.accountType !== "admin" && invoice.createdBy?.toString() !== req.user?._id?.toString()) {
       return res.status(403).json({ success: false, message: "Access denied. You can only update your own invoices." });
     }
@@ -174,7 +200,6 @@ const updateInvoice = async (req, res) => {
       invoice.grandTotal = result.grandTotal;
     }
 
-    // PDF ko regenerate karein agar data update hua ho
     try {
       await generateInvoicePDF(invoice);
     } catch (pdfErr) {
@@ -192,6 +217,7 @@ const updateInvoice = async (req, res) => {
   }
 };
 
+// 5. DELETE INVOICE
 const deleteInvoice = async (req, res) => {
   try {
     const invoice = await Invoice.findById(req.params.invoiceId);
@@ -199,7 +225,6 @@ const deleteInvoice = async (req, res) => {
       return res.status(404).json({ success: false, message: "Invoice not found." });
     }
 
-    // Check if user owns this invoice (admin can delete all)
     if (req.accountType !== "admin" && invoice.createdBy?.toString() !== req.user?._id?.toString()) {
       return res.status(403).json({ success: false, message: "Access denied. You can only delete your own invoices." });
     }
@@ -211,6 +236,7 @@ const deleteInvoice = async (req, res) => {
   }
 };
 
+// 6. DOWNLOAD PDF
 const downloadInvoicePDF = async (req, res) => {
   try {
     const invoice = await Invoice.findById(req.params.invoiceId);
@@ -218,12 +244,10 @@ const downloadInvoicePDF = async (req, res) => {
       return res.status(404).json({ success: false, message: "Invoice not found." });
     }
 
-    // Check if user owns this invoice (admin can access all)
     if (req.accountType !== "admin" && invoice.createdBy?.toString() !== req.user?._id?.toString()) {
       return res.status(403).json({ success: false, message: "Access denied. You can only download your own invoices." });
     }
 
-    // Check if PDF exists
     if (!invoice.pdfUrl) {
       return res.status(404).json({ success: false, message: "PDF not generated for this invoice." });
     }
@@ -231,21 +255,17 @@ const downloadInvoicePDF = async (req, res) => {
     const fs = require("fs");
     const path = require("path");
     
-    // Construct the full file path
     const filePath = path.join(__dirname, "../../../uploads/invoices", path.basename(invoice.pdfUrl));
     
-    // Check if file exists
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ success: false, message: "PDF file not found on server." });
     }
 
-    // Set headers for PDF download
     const filename = `Invoice-${invoice.invoiceNumber}.pdf`;
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.setHeader("Content-Transfer-Encoding", "binary");
 
-    // Send the file
     res.sendFile(filePath, (err) => {
       if (err) {
         console.error("Error sending PDF file:", err);
@@ -260,6 +280,7 @@ const downloadInvoicePDF = async (req, res) => {
   }
 };
 
+// 7. UPDATE STATUS & DISPATCH EMAIL
 const updateInvoiceStatus = async (req, res) => {
   try {
     const { invoiceId } = req.params;
@@ -274,7 +295,6 @@ const updateInvoiceStatus = async (req, res) => {
 
     const normalizedStatus = invoiceStatus.toLowerCase();
 
-    // Database Object load hook
     const invoice = await Invoice.findById(invoiceId);
     if (!invoice) {
       return res.status(404).json({
@@ -283,7 +303,6 @@ const updateInvoiceStatus = async (req, res) => {
       });
     }
 
-    // Check if user owns this invoice (admin can update all)
     if (req.accountType !== "admin" && invoice.createdBy?.toString() !== req.user?._id?.toString()) {
       return res.status(403).json({ success: false, message: "Access denied. You can only update status of your own invoices." });
     }
@@ -291,8 +310,7 @@ const updateInvoiceStatus = async (req, res) => {
     invoice.invoiceStatus = normalizedStatus;
     await invoice.save();
 
-    if (normalizedStatus === "paid") {
-      
+    if (normalizedStatus === "paid" || normalizedStatus === "approved") {
       const pdfPath = path.join(__dirname, "../..", invoice.pdfUrl || ""); 
       const recipientsList = [
         invoice.customer?.email,
@@ -331,7 +349,6 @@ const updateInvoiceStatus = async (req, res) => {
   }
 };
 
-// SINGLE CLEAN EXPORT DECLARATION FOR THE MODULE
 module.exports = {
   createInvoice,
   getInvoiceList,
