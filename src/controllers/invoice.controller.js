@@ -1,4 +1,5 @@
 const Invoice = require("../models/invoice.model");
+const axios = require("axios");
 const generateInvoiceNumber = require("../services/invoiceNumber.service");
 const calculateInvoice = require("../services/invoiceCalculation.service");
 const path = require("path");
@@ -92,14 +93,15 @@ const createInvoice = async (req, res) => {
     console.log("✅ INVOICE CREATED - Customer:", JSON.stringify(invoice.customer, null, 2));
     console.log("✅ INVOICE CREATED - Payee:", JSON.stringify(invoice.payee, null, 2));
 
-    let pdfPath = null;
+    let pdfUrl = null;
     try {
       console.log("📄 Generating PDF with invoice data...");
-      pdfPath = await generateInvoicePDF(invoice);
+      pdfUrl = await generateInvoicePDF(invoice);
       
-      invoice.pdfUrl = `/uploads/invoices/invoice-${invoice.invoiceNumber}.pdf`;
+      // pdfUrl will be Cloudinary URL or local fallback
+      invoice.pdfUrl = pdfUrl;
       await invoice.save();
-      console.log("✅ PDF generated and URL saved:", pdfPath);
+      console.log("✅ PDF generated and URL saved:", pdfUrl);
     } catch (err) {
       console.error("❌ STEP 6b: PDF Render Engine Exception encountered:", err.message);
     }
@@ -248,34 +250,50 @@ const downloadInvoicePDF = async (req, res) => {
       return res.status(403).json({ success: false, message: "Access denied. You can only download your own invoices." });
     }
 
-    if (!invoice.pdfUrl) {
-      return res.status(404).json({ success: false, message: "PDF not generated for this invoice." });
-    }
-
-    const fs = require("fs");
-    const path = require("path");
-    
-    const filePath = path.join(__dirname, "../../../uploads/invoices", path.basename(invoice.pdfUrl));
-    
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ success: false, message: "PDF file not found on server." });
-    }
-
     const filename = `Invoice-${invoice.invoiceNumber}.pdf`;
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    res.setHeader("Content-Transfer-Encoding", "binary");
 
-    res.sendFile(filePath, (err) => {
-      if (err) {
-        console.error("Error sending PDF file:", err);
-        if (!res.headersSent) {
-          res.status(500).json({ success: false, message: "Error downloading PDF." });
-        }
+    try {
+      let pdfUrl = invoice.pdfUrl;
+
+      // Check if we have a Cloudinary URL stored
+      if (!pdfUrl || (!pdfUrl.startsWith("http://") && !pdfUrl.startsWith("https://"))) {
+        // Generate new PDF if not stored or old local path
+        console.log("📄 Generating new PDF...");
+        pdfUrl = await generateInvoicePDF(invoice);
+        
+        // Save Cloudinary URL to invoice
+        invoice.pdfUrl = pdfUrl;
+        await invoice.save();
+        console.log("✅ Cloudinary URL saved:", pdfUrl);
+      } else {
+        console.log("📥 Using existing Cloudinary URL:", pdfUrl);
       }
-    });
-
+      
+      // Fetch from Cloudinary
+      console.log("📥 Downloading PDF from Cloudinary:", pdfUrl);
+      const response = await axios.get(pdfUrl, { responseType: "stream" });
+      
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.setHeader("Content-Transfer-Encoding", "binary");
+      
+      response.data.pipe(res);
+    } catch (downloadError) {
+      console.error("❌ Error in PDF download stream:", downloadError);
+      // If streaming fails, try to send the URL as JSON instead
+      if (invoice.pdfUrl) {
+        return res.json({
+          success: true,
+          message: "Direct download failed. PDF URL provided instead.",
+          pdfUrl: invoice.pdfUrl,
+          filename: filename
+        });
+      } else {
+        throw downloadError;
+      }
+    }
   } catch (error) {
+    console.error("Error downloading invoice PDF:", error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -285,6 +303,7 @@ const updateInvoiceStatus = async (req, res) => {
   try {
     const { invoiceId } = req.params;
     const { invoiceStatus } = req.body;
+    console.lo('hello world');
 
     if (!invoiceStatus) {
       return res.status(400).json({
@@ -311,28 +330,38 @@ const updateInvoiceStatus = async (req, res) => {
     await invoice.save();
 
     if (normalizedStatus === "paid" || normalizedStatus === "approved") {
-      const pdfPath = path.join(__dirname, "../..", invoice.pdfUrl || ""); 
+      const pdfPath = invoice.pdfUrl || ""; 
       const recipientsList = [
         invoice.customer?.email,
         invoice.payee?.email,
-        "dispatchgroupofcompanies@gmail.com"
+        "xcdgoc@gmail.com"
       ].filter(Boolean);
+
+      console.log("📧 EMAIL TRIGGER - Status:", normalizedStatus);
+      console.log("📧 EMAIL TRIGGER - PDF URL:", pdfPath);
+      console.log("📧 EMAIL TRIGGER - Recipients:", recipientsList);
+      console.log("📧 EMAIL TRIGGER - Invoice Number:", invoice.invoiceNumber);
 
       if (recipientsList.length > 0) {
         try {
-          await sendInvoiceEmail(recipientsList, pdfPath, invoice.invoiceNumber);
-          
-          invoice.emailStatus = "sent";
-          invoice.emailSentAt = new Date();
-          await invoice.save();
+      console.log("📧 EMAIL TRIGGER - Starting email send...");
+      await sendInvoiceEmail(recipientsList, pdfPath, invoice.invoiceNumber, null, null, invoice);
+      
+      invoice.emailStatus = "sent";
+      invoice.emailSentAt = new Date();
+      await invoice.save();
+      console.log("✅ EMAIL TRIGGER - Email sent successfully");
         } catch (mailErr) {
           invoice.emailStatus = "failed";
           await invoice.save();
-          console.error("❌ Email delivery failed:", mailErr.message);
+          console.error("❌ EMAIL TRIGGER - Email delivery failed:", mailErr.message);
+          console.error("❌ EMAIL TRIGGER - Full error:", mailErr);
         }
       } else {
-        console.log("⚠️ Email transmission skipped: No recipient list registered.");
+        console.log("⚠️ EMAIL TRIGGER - No recipient list registered.");
       }
+    } else {
+      console.log("ℹ️ EMAIL TRIGGER - Status is not 'paid' or 'approved':", normalizedStatus);
     }
 
     return res.status(200).json({

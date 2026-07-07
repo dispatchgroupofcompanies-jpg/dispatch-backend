@@ -1,7 +1,29 @@
 const nodemailer = require("nodemailer");
+const axios = require("axios");
+const fs = require("fs");
+const path = require("path");
+
+// Get email-safe HTML from frontend API
+const getEmailHtmlFromFrontend = async (invoice, type = "invoice") => {
+  try {
+    const frontendUrl = process.env.FRONTEND_URL?.split(',')[0] || 'http://localhost:3000';
+    const endpoint = type === "appointment" ? "/api/generate-appointment-email" : "/api/generate-invoice-email";
+    const response = await axios.post(`${frontendUrl}${endpoint}`, invoice);
+    
+    if (!response.data.success) {
+      throw new Error("Failed to generate email HTML from frontend");
+    }
+    
+    return response.data.html;
+  } catch (error) {
+    console.error("Error getting email HTML from frontend:", error);
+    throw error;
+  }
+};
 
 // Enhanced email function that supports both invoice and appointment emails
-const sendInvoiceEmail = async (emailsList, pdfPath, invoiceNumber, customSubject, customHtml) => {
+// invoiceData is optional - if provided, it will be used to generate email body with full details
+const sendInvoiceEmail = async (emailsList, pdfPath, invoiceNumber, customSubject, customHtml, invoiceData = null) => {
 
   try {
     console.log("📧 EMAIL SERVICE STARTED");
@@ -37,33 +59,67 @@ const sendInvoiceEmail = async (emailsList, pdfPath, invoiceNumber, customSubjec
     const finalRecipients = Array.isArray(emailsList) ? emailsList.join(", ") : emailsList;
     console.log(`📧 Final recipients: ${finalRecipients}`);
 
-    // Use custom subject/html if provided, otherwise use default invoice template
+    // Use custom subject/html if provided, otherwise get email-safe HTML from frontend
     const subject = customSubject || `Invoice #${invoiceNumber} Generated — Dispatch Group`;
-    const html = customHtml || `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #334155;">
-        <h2 style="color: #1e3a8a; margin-bottom: 10px;">Invoice #${invoiceNumber}</h2>
-        <p style="font-size: 14px; line-height: 1.6;">Hello,</p>
-        <p style="font-size: 14px; line-height: 1.6;">Please find attached your professional copy of Invoice #${invoiceNumber}.</p>
-        
-        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; margin: 20px 0; border-radius: 4px;">
-          <h3 style="color: #1e3a8a; margin: 0 0 10px 0; font-size: 14px;">Payment Methods Available:</h3>
-          <ul style="margin: 0; padding-left: 20px; line-height: 1.8;">
-            <li><strong>Direct Deposit:</strong> See attached PDF for complete banking details</li>
-            <li><strong>💥 E-Transfer:</strong> See attached PDF for E-Transfer email address</li>
-          </ul>
-        </div>
-        
-        <p style="font-size: 14px; line-height: 1.6;">Thank you for your business!</p>
-        <p style="font-size: 12px; color: #64748b; margin-top: 20px;">— Dispatch Group Billing Team</p>
-        <div style="height: 30px;"></div>
-      </div>
-    `;
+    let html = customHtml;
+    
+    if (!html) {
+      try {
+        // Use invoiceData if available, otherwise just send invoiceNumber
+        const emailData = invoiceData || { invoiceNumber };
+        html = await getEmailHtmlFromFrontend(emailData, "invoice");
+      } catch (error) {
+        console.error("Failed to get email HTML from frontend, using simple fallback:", error);
+        // Simple fallback without any PDF styling
+        html = `
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-family: Arial, sans-serif; color: #1e293b; max-width: 600px; margin: 0 auto;">
+            <tr>
+              <td style="padding: 20px; background-color: #ffffff;">
+                <h1 style="margin: 0; font-size: 20px; font-weight: bold; color: #1e3a8a; text-transform: uppercase;">INVOICE</h1>
+                <p style="margin: 4px 0 0 0; font-size: 12px; color: #64748b;">Invoice #: <strong>#${invoiceNumber}</strong></p>
+                <p style="margin: 20px 0 0 0; font-size: 14px; line-height: 1.5; color: #475569;">Please find attached your invoice as a PDF.</p>
+              </td>
+            </tr>
+          </table>
+        `;
+      }
+    }
 
     // Build attachments array only if pdfPath is provided
-    const attachments = pdfPath ? [{
-      filename: `invoice-${invoiceNumber}.pdf`,
-      path: pdfPath,
-    }] : [];
+    let attachments = [];
+    if (pdfPath) {
+      // Check if pdfPath is a Cloudinary URL (starts with http:// or https://)
+      if (pdfPath.startsWith("http://") || pdfPath.startsWith("https://")) {
+        console.log("📧 Downloading PDF from Cloudinary...");
+        try {
+          const response = await axios.get(pdfPath, { responseType: "arraybuffer" });
+          const tempPath = path.join(process.cwd(), "uploads", "temp-email-attachment.pdf");
+          
+          // Ensure temp directory exists
+          const tempDir = path.dirname(tempPath);
+          if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+          }
+          
+          fs.writeFileSync(tempPath, response.data);
+          console.log("✅ PDF downloaded from Cloudinary to temp file");
+          
+          attachments = [{
+            filename: `invoice-${invoiceNumber}.pdf`,
+            path: tempPath,
+          }];
+        } catch (downloadError) {
+          console.error("❌ Failed to download PDF from Cloudinary:", downloadError.message);
+          // Continue without attachment
+        }
+      } else {
+        // Local file path
+        attachments = [{
+          filename: `invoice-${invoiceNumber}.pdf`,
+          path: pdfPath,
+        }];
+      }
+    }
 
     const mailOptions = {
       from: `"Dispatch Group" <${process.env.EMAIL_USER}>`,
@@ -76,7 +132,7 @@ const sendInvoiceEmail = async (emailsList, pdfPath, invoiceNumber, customSubjec
       mailOptions.html = customHtml;
       mailOptions.text = "Please view this email in HTML format.";
     } else {
-      mailOptions.text = `Hello,\n\nPlease find attached your professional copy of Invoice #${invoiceNumber}.\n\nPayment Methods:\n- Direct Deposit: See attached PDF for banking details\n- E-Transfer: See attached PDF for E-Transfer email address\n\nThank you for business!`;
+      mailOptions.text = `Hello,\n\nPlease find attached your professional copy of Invoice #${invoiceNumber}.\n\nPayment Methods:\n- Direct Deposit: See attached PDF for banking details\n- E-Transfer: See attached PDF for E-Transfer email address\n\nThank you for your business!\n\n— Dispatch Group Billing Team`;
       mailOptions.html = html;
     }
 
@@ -89,6 +145,16 @@ const sendInvoiceEmail = async (emailsList, pdfPath, invoiceNumber, customSubjec
     const result = await transporter.sendMail(mailOptions);
     console.log("✅ Email sent successfully!");
     console.log(`📧 Message ID: ${result.messageId}`);
+
+    // Clean up temp file if it was created
+    if (attachments.length > 0 && attachments[0].path.includes("temp-email-attachment.pdf")) {
+      try {
+        fs.unlinkSync(attachments[0].path);
+        console.log("🗑️ Temp attachment file cleaned up");
+      } catch (cleanupError) {
+        console.warn("⚠️ Could not clean up temp file:", cleanupError.message);
+      }
+    }
 
     return result;
   } catch (error) {

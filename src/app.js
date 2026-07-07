@@ -16,6 +16,9 @@ const adminAppointmentRoutes = require("./routes/admin/appointment.routes");
 const adminUserRoutes = require("./routes/admin/user.routes");
 const adminRoutes = require("./routes/admin.routes");
 
+// Public Routes (no authentication required)
+const publicRoutes = require("./routes/public.routes");
+
 // User Routes
 const userInvoiceRoutes = require("./routes/user/invoice.routes");
 const userAppointmentRoutes = require("./routes/user/appointment.routes");
@@ -83,6 +86,9 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/user/invoices", userInvoiceRoutes);
 app.use("/api/user/appointments", userAppointmentRoutes);
 app.use("/api/user/dashboard", userDashboardRoutes);
+
+// Public Routes (accessible without authentication)
+app.use("/api", publicRoutes);
 
 // Legacy Routes (kept for backward compatibility during migration)
 app.use("/api/invoices", legacyInvoiceRoutes);

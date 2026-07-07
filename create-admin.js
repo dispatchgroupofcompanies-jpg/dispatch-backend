@@ -10,7 +10,7 @@ async function createAdmin() {
     await mongoose.connect(MONGODB_URI);
     console.log('✅ Connected to MongoDB');
 
-    const existingAdmin = await User.findOne({ email: 'dispatchgroupofcompanies@gmail.com' });
+    const existingAdmin = await User.findOne({ email: 'xcdgoc@gmail.com' });
     
     if (existingAdmin) {
       
@@ -32,7 +32,7 @@ async function createAdmin() {
       // Create admin user
       const admin = await User.create({
         name: 'System Admin',
-        email: 'dispatchgroupofcompanies@gmail.com',
+        email: 'xcdgoc@gmail.com',
         password: hashedPassword,
         role: 'admin',
         isActive: true,

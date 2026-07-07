@@ -131,21 +131,39 @@ exports.updateInvoiceStatus = async (req, res) => {
     if (status === "approved") {
       try {
         console.log(`📧 Attempting to send approval email for invoice: ${updatedInvoice.invoiceNumber}`);
+        console.log(`📧 Invoice pdfUrl from DB: ${updatedInvoice.pdfUrl}`);
         
-        const pdfPath = path.join(process.cwd(), updatedInvoice.pdfUrl || "");
-        console.log(`📧 PDF Path: ${pdfPath}`);
-        console.log(`📧 PDF exists: ${require('fs').existsSync(pdfPath)}`);
+        // Determine the correct PDF path/URL
+        let pdfPath = updatedInvoice.pdfUrl;
+        
+        // If pdfUrl is a Cloudinary URL (starts with http), use it directly
+        if (pdfPath && (pdfPath.startsWith("http://") || pdfPath.startsWith("https://"))) {
+          console.log(`📧 Using Cloudinary URL: ${pdfPath}`);
+        } 
+        // If pdfUrl is empty or invalid, we need to regenerate the PDF
+        else {
+          console.log(`⚠️ pdfUrl is missing or invalid, regenerating PDF...`);
+          const generateInvoicePDF = require("../../services/pdf.service");
+          pdfPath = await generateInvoicePDF(updatedInvoice);
+          
+          // Save the Cloudinary URL back to the invoice
+          updatedInvoice.pdfUrl = pdfPath;
+          await updatedInvoice.save();
+          console.log(`✅ PDF regenerated and URL saved: ${pdfPath}`);
+        }
+        
+        console.log(`📧 Final PDF Path/URL: ${pdfPath}`);
         
         const recipientsList = [
           updatedInvoice.customer?.email,
           updatedInvoice.payee?.email,
-          "dispatchgroupofcompanies@gmail.com"
+          "xcdgoc@gmail.com"
         ].filter(Boolean);
         
         console.log(`📧 Recipients: ${JSON.stringify(recipientsList)}`);
 
         if (recipientsList.length > 0) {
-          await sendInvoiceEmail(recipientsList, pdfPath, updatedInvoice.invoiceNumber);
+          await sendInvoiceEmail(recipientsList, pdfPath, updatedInvoice.invoiceNumber, null, null, updatedInvoice);
           
           updatedInvoice.emailStatus = "sent";
           updatedInvoice.emailSentAt = new Date();

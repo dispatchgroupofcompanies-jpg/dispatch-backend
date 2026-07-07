@@ -11,7 +11,7 @@ async function updateUsers() {
     console.log('✅ Connected to MongoDB\n');
 
     // 1. Update/Fix the main admin user
-    const adminEmail = 'dispatchgroupofcompanies@gmail.com';
+    const adminEmail = 'xcdgoc@gmail.com';
     const admin = await User.findOne({ email: adminEmail });
     
     if (admin) {
@@ -82,7 +82,7 @@ async function updateUsers() {
 
     console.log('\n✅ All updates completed successfully!');
     console.log('\n🔐 Admin Login Credentials:');
-    console.log('📧 Email: dispatchgroupofcompanies@gmail.com');
+    console.log('📧 Email: xcdgoc@gmail.com');
     console.log('🔑 Password: 111111');
 
     await mongoose.disconnect();

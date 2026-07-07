@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const axios = require("axios");
 const Appointment = require("../../models/appointment.model");
 const sendInvoiceEmail = require("../../services/email.service");
 const generateAppointmentPDF = require("../../services/appointment-pdf.service");
@@ -271,31 +272,50 @@ exports.downloadAppointmentPDF = async (req, res) => {
       });
     }
 
-    const dateFormatted = appointment.appointmentDate 
-      ? new Date(appointment.appointmentDate).toLocaleDateString("en-CA", { year: "numeric", month: "long", day: "numeric" }) 
-      : "N/A";
+    const filename = `appointment-${appointment._id}.pdf`;
 
-    const pickupDateOpt = appointment.pickupDate 
-      ? new Date(appointment.pickupDate).toLocaleDateString("en-CA", { year: "numeric", month: "long", day: "numeric" }) 
-      : "N/A";
+    try {
+      let pdfUrl = appointment.pdfUrl;
 
-    const deliveryDateOpt = appointment.deliveryDate 
-      ? new Date(appointment.deliveryDate).toLocaleDateString("en-CA", { year: "numeric", month: "long", day: "numeric" }) 
-      : "N/A";
-
-    const fullHtmlLayout = getEmailTemplate(appointment, dateFormatted, pickupDateOpt, deliveryDateOpt);
-    const filePath = await generateAppointmentPDF(appointment, fullHtmlLayout);
-    
-    res.download(filePath, `appointment-${appointment._id}.pdf`, (err) => {
-      if (err) {
-        console.error("Error downloading PDF:", err);
-        if (!res.headersSent) {
-          res.status(500).json({ success: false, message: "Error downloading PDF" });
-        }
+      // Check if we have a Cloudinary URL stored
+      if (!pdfUrl || (!pdfUrl.startsWith("http://") && !pdfUrl.startsWith("https://"))) {
+        // Generate new PDF if not stored or old local path
+        console.log("📄 Generating new PDF...");
+        pdfUrl = await generateAppointmentPDF(appointment);
+        
+        // Save Cloudinary URL to appointment
+        appointment.pdfUrl = pdfUrl;
+        await appointment.save();
+        console.log("✅ Cloudinary URL saved:", pdfUrl);
+      } else {
+        console.log("📥 Using existing Cloudinary URL:", pdfUrl);
       }
-    });
+      
+      // Fetch from Cloudinary
+      console.log("📥 Downloading PDF from Cloudinary:", pdfUrl);
+      const response = await axios.get(pdfUrl, { responseType: "stream" });
+      
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.setHeader("Content-Transfer-Encoding", "binary");
+      
+      response.data.pipe(res);
+    } catch (downloadError) {
+      console.error("❌ Error in PDF download stream:", downloadError);
+      // If streaming fails, try to send the URL as JSON instead
+      if (appointment.pdfUrl) {
+        return res.json({
+          success: true,
+          message: "Direct download failed. PDF URL provided instead.",
+          pdfUrl: appointment.pdfUrl,
+          filename: filename
+        });
+      } else {
+        throw downloadError;
+      }
+    }
   } catch (error) {
-    console.error("Error generating appointment PDF:", error);
+    console.error("Error downloading appointment PDF:", error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };

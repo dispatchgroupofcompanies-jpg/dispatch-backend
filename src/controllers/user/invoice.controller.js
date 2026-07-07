@@ -1,4 +1,5 @@
 const Invoice = require("../../models/invoice.model");
+const axios = require("axios");
 const generateInvoicePDF = require("../../services/pdf.service");
 
 // User: Create new invoice
@@ -286,39 +287,50 @@ exports.downloadInvoicePDF = async (req, res) => {
       });
     }
 
-    // Check if PDF exists
-    if (!invoice.pdfUrl) {
-      return res.status(404).json({ success: false, message: "PDF not generated for this invoice." });
-    }
-
-    const fs = require("fs");
-    const path = require("path");
-    
-    // Construct the full file path
-    const filePath = path.join(__dirname, "../../../uploads/invoices", path.basename(invoice.pdfUrl));
-    
-    // Check if file exists
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ success: false, message: "PDF file not found on server." });
-    }
-
-    // Set headers for PDF download
     const filename = `Invoice-${invoice.invoiceNumber}.pdf`;
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    res.setHeader("Content-Transfer-Encoding", "binary");
 
-    // Send the file
-    res.sendFile(filePath, (err) => {
-      if (err) {
-        console.error("Error sending PDF file:", err);
-        if (!res.headersSent) {
-          res.status(500).json({ success: false, message: "Error downloading PDF." });
-        }
+    try {
+      let pdfUrl = invoice.pdfUrl;
+
+      // Check if we have a Cloudinary URL stored
+      if (!pdfUrl || (!pdfUrl.startsWith("http://") && !pdfUrl.startsWith("https://"))) {
+        // Generate new PDF if not stored or old local path
+        console.log("📄 Generating new PDF...");
+        pdfUrl = await generateInvoicePDF(invoice);
+        
+        // Save Cloudinary URL to invoice
+        invoice.pdfUrl = pdfUrl;
+        await invoice.save();
+        console.log("✅ Cloudinary URL saved:", pdfUrl);
+      } else {
+        console.log("📥 Using existing Cloudinary URL:", pdfUrl);
       }
-    });
-
+      
+      // Fetch from Cloudinary
+      console.log("📥 Downloading PDF from Cloudinary:", pdfUrl);
+      const response = await axios.get(pdfUrl, { responseType: "stream" });
+      
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.setHeader("Content-Transfer-Encoding", "binary");
+      
+      response.data.pipe(res);
+    } catch (downloadError) {
+      console.error("❌ Error in PDF download stream:", downloadError);
+      // If streaming fails, try to send the URL as JSON instead
+      if (invoice.pdfUrl) {
+        return res.json({
+          success: true,
+          message: "Direct download failed. PDF URL provided instead.",
+          pdfUrl: invoice.pdfUrl,
+          filename: filename
+        });
+      } else {
+        throw downloadError;
+      }
+    }
   } catch (error) {
+    console.error("Error downloading invoice PDF:", error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };

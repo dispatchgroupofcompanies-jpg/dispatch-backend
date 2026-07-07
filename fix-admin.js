@@ -9,7 +9,7 @@ async function fixAdmin() {
     console.log('✅ Connected to MongoDB');
 
     // Find the admin user
-    const admin = await User.findOne({ email: 'dispatchgroupofcompanies@gmail.com' });
+    const admin = await User.findOne({ email: 'xcdgoc@gmail.com' });
     
     if (!admin) {
       console.log('❌ Admin user not found');
@@ -47,7 +47,7 @@ async function fixAdmin() {
     console.log('Address:', updatedAdmin.address);
 
     console.log('\n🎉 Admin fix complete! You can now login with:');
-    console.log('📧 Email: dispatchgroupofcompanies@gmail.com');
+    console.log('📧 Email: xcdgoc@gmail.com');
     console.log('🔑 Password: 111111');
 
     await mongoose.disconnect();

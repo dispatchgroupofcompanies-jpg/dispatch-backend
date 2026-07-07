@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const axios = require("axios");
 const Appointment = require("../models/appointment.model");
 const sendInvoiceEmail = require("../services/email.service");
 const generateAppointmentPDF = require("../services/appointment-pdf.service");
@@ -16,6 +17,80 @@ const createAppointment = async (req, res) => {
     
     const appointment = await Appointment.create(appointmentData);
 
+    // Send email notification when appointment is created
+    console.log("📧 Attempting to send appointment confirmation email...");
+    
+    const recipientEmail = appointment.carrierEmail || appointment.email;
+    
+    if (recipientEmail) {
+      try {
+        // Format dates
+        const dateFormatted = appointment.appointmentDate 
+          ? new Date(appointment.appointmentDate).toLocaleDateString("en-CA", {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            }) 
+          : "N/A";
+
+        const pickupDateOpt = appointment.pickupDate 
+          ? new Date(appointment.pickupDate).toLocaleDateString("en-CA", {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            }) 
+          : "N/A";
+
+        const deliveryDateOpt = appointment.deliveryDate 
+          ? new Date(appointment.deliveryDate).toLocaleDateString("en-CA", {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            }) 
+          : "N/A";
+
+        console.log("📄 Generating email template...");
+        const emailContent = getEmailTemplate(appointment, dateFormatted, pickupDateOpt, deliveryDateOpt);
+        
+        console.log("📄 Generating appointment PDF...");
+        const pdfUrl = await generateAppointmentPDF(appointment);
+        console.log("✅ PDF generated and uploaded to Cloudinary:", pdfUrl);
+        
+        // Save Cloudinary URL to appointment
+        appointment.pdfUrl = pdfUrl;
+        await appointment.save();
+        
+        console.log("📤 Sending email to:", recipientEmail);
+        
+        const emailResult = await sendInvoiceEmail(
+          [recipientEmail],
+          pdfUrl,
+          "Appointment Confirmation", 
+          "Appointment Confirmation", 
+          emailContent 
+        );
+        
+        console.log(`✅ Email sent successfully for new appointment`);
+        console.log("📬 Email Details:", {
+          to: recipientEmail,
+          subject: "Appointment Confirmation",
+          messageId: emailResult?.messageId,
+          response: emailResult?.response,
+          pdfAttached: true
+        });
+      } catch (emailErr) {
+        console.error(`❌ ERROR: Appointment confirmation email failed to send`);
+        console.error("📧 Email Error Details:", {
+          error: emailErr.message,
+          code: emailErr.code,
+          to: recipientEmail,
+          subject: "Appointment Confirmation"
+        });
+        // Don't fail the appointment creation if email fails
+      }
+    } else {
+      console.warn("⚠️ WARNING: Appointment created but no email address found. Skipping notification.");
+    }
 
     return res.status(201).json({
       success: true,
@@ -162,14 +237,18 @@ const updateAppointmentStatus = async (req, res) => {
         
         console.log("📄 Generating appointment PDF...");
         // Pass formatted variables or handle layout sync inside the PDF script
-        const pdfPath = await generateAppointmentPDF(appointment);
-        console.log("✅ PDF generated:", pdfPath);
+        const pdfUrl = await generateAppointmentPDF(appointment);
+        console.log("✅ PDF generated and uploaded to Cloudinary:", pdfUrl);
+        
+        // Save Cloudinary URL to appointment
+        appointment.pdfUrl = pdfUrl;
+        await appointment.save();
         
         console.log("📤 Sending email to:", recipientEmail);
         
         const emailResult = await sendInvoiceEmail(
           [recipientEmail],
-          pdfPath,
+          pdfUrl, // Pass Cloudinary URL directly
           `Appointment Status Update - ${status.charAt(0).toUpperCase() + status.slice(1)}`, 
           `Appointment Status Update - ${status.charAt(0).toUpperCase() + status.slice(1)}`, 
           emailContent 
@@ -269,35 +348,50 @@ const downloadAppointmentPDF = async (req, res) => {
       return res.status(403).json({ success: false, message: "Access denied. You can only download your own appointments." });
     }
 
-    // Clear string fallbacks to prevent "Invalid Date" strings in the PDF generation
-    const dateFormatted = appointment.appointmentDate 
-      ? new Date(appointment.appointmentDate).toLocaleDateString("en-CA", { year: "numeric", month: "long", day: "numeric" }) 
-      : "N/A";
+    const filename = `appointment-${appointment._id}.pdf`;
 
-    const pickupDateOpt = appointment.pickupDate 
-      ? new Date(appointment.pickupDate).toLocaleDateString("en-CA", { year: "numeric", month: "long", day: "numeric" }) 
-      : "N/A";
+    try {
+      let pdfUrl = appointment.pdfUrl;
 
-    const deliveryDateOpt = appointment.deliveryDate 
-      ? new Date(appointment.deliveryDate).toLocaleDateString("en-CA", { year: "numeric", month: "long", day: "numeric" }) 
-      : "N/A";
-
-    // Generate HTML layout context block matching email format engine
-    const fullHtmlLayout = getEmailTemplate(appointment, dateFormatted, pickupDateOpt, deliveryDateOpt);
-
-    // Pass the built layout configuration object or custom HTML text down to the service engine
-    const filePath = await generateAppointmentPDF(appointment, fullHtmlLayout);
-    
-    res.download(filePath, `appointment-${appointment._id}.pdf`, (err) => {
-      if (err) {
-        console.error("Error downloading PDF:", err);
-        if (!res.headersSent) {
-          res.status(500).json({ success: false, message: "Error downloading PDF" });
-        }
+      // Check if we have a Cloudinary URL stored
+      if (!pdfUrl || (!pdfUrl.startsWith("http://") && !pdfUrl.startsWith("https://"))) {
+        // Generate new PDF if not stored or old local path
+        console.log("📄 Generating new PDF...");
+        pdfUrl = await generateAppointmentPDF(appointment);
+        
+        // Save Cloudinary URL to appointment
+        appointment.pdfUrl = pdfUrl;
+        await appointment.save();
+        console.log("✅ Cloudinary URL saved:", pdfUrl);
+      } else {
+        console.log("📥 Using existing Cloudinary URL:", pdfUrl);
       }
-    });
+      
+      // Fetch from Cloudinary
+      console.log("📥 Downloading PDF from Cloudinary:", pdfUrl);
+      const response = await axios.get(pdfUrl, { responseType: "stream" });
+      
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.setHeader("Content-Transfer-Encoding", "binary");
+      
+      response.data.pipe(res);
+    } catch (downloadError) {
+      console.error("❌ Error in PDF download stream:", downloadError);
+      // If streaming fails, try to send the URL as JSON instead
+      if (appointment.pdfUrl) {
+        return res.json({
+          success: true,
+          message: "Direct download failed. PDF URL provided instead.",
+          pdfUrl: appointment.pdfUrl,
+          filename: filename
+        });
+      } else {
+        throw downloadError;
+      }
+    }
   } catch (error) {
-    console.error("Error generating appointment PDF:", error);
+    console.error("Error downloading appointment PDF:", error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
