@@ -4,7 +4,8 @@ const router = express.Router();
 const {
   getAllInvoices,
   updateInvoiceStatus,
-  rejectInvoice
+  rejectInvoice,
+  downloadInvoicePDF
 } = require("../../controllers/admin/invoice.controller.js");
 
 const authenticate = require("../../middleware/auth.middleware");
@@ -14,6 +15,7 @@ router.use(authenticate);
 
 // Admin Invoice Management
 router.get("/", getAllInvoices);
+router.get("/:id/download", downloadInvoicePDF);
 router.patch("/:id/status", updateInvoiceStatus);
 router.patch("/rejected/:id/status", rejectInvoice);
 

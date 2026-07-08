@@ -290,21 +290,14 @@ exports.downloadInvoicePDF = async (req, res) => {
     const filename = `Invoice-${invoice.invoiceNumber}.pdf`;
 
     try {
-      let pdfUrl = invoice.pdfUrl;
-
-      // Check if we have a Cloudinary URL stored
-      if (!pdfUrl || (!pdfUrl.startsWith("http://") && !pdfUrl.startsWith("https://"))) {
-        // Generate new PDF if not stored or old local path
-        console.log("📄 Generating new PDF...");
-        pdfUrl = await generateInvoicePDF(invoice);
-        
-        // Save Cloudinary URL to invoice
-        invoice.pdfUrl = pdfUrl;
-        await invoice.save();
-        console.log("✅ Cloudinary URL saved:", pdfUrl);
-      } else {
-        console.log("📥 Using existing Cloudinary URL:", pdfUrl);
-      }
+      // Always generate new PDF to ensure latest template is used
+      console.log("📄 Generating fresh PDF with latest template...");
+      const pdfUrl = await generateInvoicePDF(invoice);
+      
+      // Save Cloudinary URL to invoice
+      invoice.pdfUrl = pdfUrl;
+      await invoice.save();
+      console.log("✅ Fresh PDF generated and URL saved:", pdfUrl);
       
       // Fetch from Cloudinary
       console.log("📥 Downloading PDF from Cloudinary:", pdfUrl);

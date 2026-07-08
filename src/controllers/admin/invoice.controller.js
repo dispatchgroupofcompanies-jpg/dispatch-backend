@@ -1,6 +1,8 @@
 const Invoice = require("../../models/invoice.model");
 const path = require("path");
+const axios = require("axios");
 const sendInvoiceEmail = require("../../services/email.service");
+const generateInvoicePDF = require("../../services/pdf.service");
 
 // Admin: Get all invoices with pagination and filters (with user-based access control)
 exports.getAllInvoices = async (req, res) => {
@@ -222,5 +224,54 @@ exports.rejectInvoice = async (req, res) => {
       success: false,
       message: "Internal server error while rejecting invoice",
     });
+  }
+};
+
+// Admin: Download invoice PDF (no ownership check - admins can download any invoice)
+exports.downloadInvoicePDF = async (req, res) => {
+  try {
+    const invoice = await Invoice.findById(req.params.id);
+    if (!invoice) {
+      return res.status(404).json({ success: false, message: "Invoice not found." });
+    }
+
+    const filename = `Invoice-${invoice.invoiceNumber}.pdf`;
+
+    try {
+      // Always generate new PDF to ensure latest template is used
+      console.log("📄 Generating fresh PDF with latest template...");
+      const pdfUrl = await generateInvoicePDF(invoice);
+      
+      // Save Cloudinary URL to invoice
+      invoice.pdfUrl = pdfUrl;
+      await invoice.save();
+      console.log("✅ Fresh PDF generated and URL saved:", pdfUrl);
+      
+      // Fetch from Cloudinary
+      console.log("📥 Downloading PDF from Cloudinary:", pdfUrl);
+      const response = await axios.get(pdfUrl, { responseType: "stream" });
+      
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.setHeader("Content-Transfer-Encoding", "binary");
+      
+      response.data.pipe(res);
+    } catch (downloadError) {
+      console.error("❌ Error in PDF download stream:", downloadError);
+      // If streaming fails, try to send the URL as JSON instead
+      if (invoice.pdfUrl) {
+        return res.json({
+          success: true,
+          message: "Direct download failed. PDF URL provided instead.",
+          pdfUrl: invoice.pdfUrl,
+          filename: filename
+        });
+      } else {
+        throw downloadError;
+      }
+    }
+  } catch (error) {
+    console.error("Error downloading invoice PDF:", error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
