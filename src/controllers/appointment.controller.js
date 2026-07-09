@@ -6,22 +6,14 @@ const generateAppointmentPDF = require("../services/appointment-pdf.service");
 
 // Create a new appointment
 const createAppointment = async (req, res) => {
-  try {
-
-    
+  try {    
     // Add userId from authenticated user
     const appointmentData = {
       ...req.body,
       userId: req.user._id,
     };
-    
-    const appointment = await Appointment.create(appointmentData);
-
-    // Send email notification when appointment is created
-    console.log("📧 Attempting to send appointment confirmation email...");
-    
+    const appointment = await Appointment.create(appointmentData)
     const recipientEmail = appointment.carrierEmail || appointment.email;
-    
     if (recipientEmail) {
       try {
         // Format dates
@@ -49,12 +41,10 @@ const createAppointment = async (req, res) => {
             }) 
           : "N/A";
 
-        console.log("📄 Generating email template...");
         const emailContent = getEmailTemplate(appointment, dateFormatted, pickupDateOpt, deliveryDateOpt);
         
-        console.log("📄 Generating appointment PDF...");
         const pdfUrl = await generateAppointmentPDF(appointment);
-        console.log("✅ PDF generated and uploaded to Cloudinary:", pdfUrl);
+        
         
         // Save Cloudinary URL to appointment
         appointment.pdfUrl = pdfUrl;
@@ -70,14 +60,7 @@ const createAppointment = async (req, res) => {
           emailContent 
         );
         
-        console.log(`✅ Email sent successfully for new appointment`);
-        console.log("📬 Email Details:", {
-          to: recipientEmail,
-          subject: "Appointment Confirmation",
-          messageId: emailResult?.messageId,
-          response: emailResult?.response,
-          pdfAttached: true
-        });
+       
       } catch (emailErr) {
         console.error(`❌ ERROR: Appointment confirmation email failed to send`);
         console.error("📧 Email Error Details:", {
@@ -110,9 +93,6 @@ const createAppointment = async (req, res) => {
 // Get all appointments (user-specific or all for admin)
 const getAppointments = async (req, res) => {
   try {
-    console.log("🔍 getAppointments - req.user:", req.user ? "exists" : "undefined");
-    console.log("🔍 getAppointments - req.accountType:", req.accountType);
-    
     let query = {};
     
     // If user is not admin, filter by userId

@@ -91,11 +91,7 @@ const ipWhitelist = (req, res, next) => {
     normalizedClientIp = clientIp.substring(7); // Remove "::ffff:" prefix
   }
 
-  // Log detailed information
-  console.log("🔍 IP Whitelist Check:");
-  console.log(`   Client IP: ${clientIp}`);
-  console.log(`   Normalized IP: ${normalizedClientIp}`);
-  console.log(`   Allowed IPs: ${allowedIps.join(", ")}`);
+
 
   // Check if client IP is in whitelist
   const isAllowed = allowedIps.some(allowedIp => {

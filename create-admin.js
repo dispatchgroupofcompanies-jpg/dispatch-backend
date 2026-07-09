@@ -9,12 +9,10 @@ const MONGODB_URI = process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb
 async function createAdmin() {
   try {
     await mongoose.connect(MONGODB_URI);
-    console.log('✅ Connected to MongoDB');
 
     const existingAdmin = await User.findOne({ email: 'xcdgoc@gmail.com' });
     
     if (existingAdmin) {
-      console.log('🔄 Updating existing admin user...');
       
       existingAdmin.role = 'admin';
       existingAdmin.isActive = true;
@@ -23,7 +21,6 @@ async function createAdmin() {
       
       await existingAdmin.save();
     } else {
-      console.log('📝 Creating new admin user...');
       
       // Create admin user - password will be hashed by schema pre-save hook
       const admin = await User.create({
@@ -35,7 +32,6 @@ async function createAdmin() {
         address: 'Admin Address'
       });
       
-      console.log('✅ Admin user created successfully');
     }
 
    
