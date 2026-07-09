@@ -21,14 +21,20 @@ const loadBoardSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    load1Id: {
+      type: String,
+      trim: true,
+    },
+    load2Id: {
+      type: String,
+      trim: true,
+    },
     vrid: {
       type: String,
-      required: [true, "VRID is required"],
       trim: true,
     },
     legs: {
       type: Number,
-      required: [true, "Legs is required"],
       min: 1,
       max: 2,
       default: 1,
@@ -43,22 +49,18 @@ const loadBoardSchema = new mongoose.Schema(
     },
     tripCharges: {
       type: Number,
-      required: [true, "Trip charges are required"],
       min: 0,
     },
     dispatcher: {
       type: String,
-      required: [true, "Dispatcher name is required"],
       trim: true,
     },
     driverName: {
       type: String,
-      required: [true, "Driver name is required"],
       trim: true,
     },
     dispatchCharges: {
       type: Number,
-      required: [true, "Dispatch charges are required"],
       min: 0,
     },
     tonu: {
@@ -75,10 +77,67 @@ const loadBoardSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    loads: [
+      {
+        vrid: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        load1Id: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        load2Id: {
+          type: String,
+          trim: true,
+        },
+        tripCharges: {
+          type: Number,
+          required: true,
+          min: 0,
+        },
+        dispatcher: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        driverName: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        dispatchCharges: {
+          type: Number,
+          required: true,
+          min: 0,
+        },
+        tonu: {
+          type: Boolean,
+          default: false,
+        },
+        date: {
+          type: String,
+          required: true,
+        },
+        mgCharges: {
+          type: Number,
+          required: true,
+          min: 0,
+          default: 0,
+        },
+      },
+    ],
   },
   {
     timestamps: true,
   }
 );
+
+// Add indexes for optimization
+loadBoardSchema.index({ createdBy: 1, createdAt: -1 });
+loadBoardSchema.index({ status: 1 });
+loadBoardSchema.index({ date: -1 });
 
 module.exports = mongoose.model("LoadBoard", loadBoardSchema);

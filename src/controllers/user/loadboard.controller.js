@@ -13,7 +13,8 @@ exports.getAllLoadBoardRecords = async (req, res) => {
     }
 
     const records = await LoadBoard.find({ createdBy: userId })
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     res.status(200).json({
       success: true,
@@ -66,7 +67,7 @@ exports.searchLoadBoardRecords = async (req, res) => {
         { dispatcher: searchRegex },
         { driverName: searchRegex }
       ]
-    }).sort({ createdAt: -1 });
+    }).sort({ createdAt: -1 }).lean();
 
     res.status(200).json({
       success: true,
@@ -106,6 +107,28 @@ exports.createLoadBoardRecord = async (req, res) => {
       recordData.date = new Date(recordData.date);
     }
 
+    // Ensure legs is at least 1
+    if (!recordData.legs || recordData.legs < 1) {
+      recordData.legs = 1;
+    }
+
+    // If loads array exists and has items, sync the main record fields with first load
+    if (recordData.loads && recordData.loads.length > 0) {
+      const firstLoad = recordData.loads[0];
+      recordData.load1Id = firstLoad.load1Id || recordData.load1Id || "";
+      recordData.load2Id = firstLoad.load2Id || recordData.load2Id || "";
+      recordData.vrid = firstLoad.vrid || recordData.vrid || "";
+      recordData.tripCharges = firstLoad.tripCharges || recordData.tripCharges || 0;
+      recordData.dispatcher = firstLoad.dispatcher || recordData.dispatcher || "";
+      recordData.driverName = firstLoad.driverName || recordData.driverName || "";
+      recordData.dispatchCharges = firstLoad.dispatchCharges || recordData.dispatchCharges || 0;
+      recordData.tonu = firstLoad.tonu !== undefined ? firstLoad.tonu : recordData.tonu || false;
+      if (firstLoad.date && !recordData.date) {
+        recordData.date = new Date(firstLoad.date);
+      }
+      recordData.mgCharges = firstLoad.mgCharges || recordData.mgCharges || 0;
+    }
+
     const record = await LoadBoard.create(recordData);
 
     res.status(201).json({
@@ -118,6 +141,7 @@ exports.createLoadBoardRecord = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Internal server error while creating load board record",
+      error: error.message,
     });
   }
 };
@@ -141,11 +165,33 @@ exports.updateLoadBoardRecord = async (req, res) => {
       updateData.date = new Date(updateData.date);
     }
 
+    // Ensure legs is at least 1
+    if (!updateData.legs || updateData.legs < 1) {
+      updateData.legs = 1;
+    }
+
+    // If loads array exists and has items, sync the main record fields with first load
+    if (updateData.loads && updateData.loads.length > 0) {
+      const firstLoad = updateData.loads[0];
+      updateData.load1Id = firstLoad.load1Id || updateData.load1Id || "";
+      updateData.load2Id = firstLoad.load2Id || updateData.load2Id || "";
+      updateData.vrid = firstLoad.vrid || updateData.vrid || "";
+      updateData.tripCharges = firstLoad.tripCharges || updateData.tripCharges || 0;
+      updateData.dispatcher = firstLoad.dispatcher || updateData.dispatcher || "";
+      updateData.driverName = firstLoad.driverName || updateData.driverName || "";
+      updateData.dispatchCharges = firstLoad.dispatchCharges || updateData.dispatchCharges || 0;
+      updateData.tonu = firstLoad.tonu !== undefined ? firstLoad.tonu : updateData.tonu || false;
+      if (firstLoad.date && !updateData.date) {
+        updateData.date = new Date(firstLoad.date);
+      }
+      updateData.mgCharges = firstLoad.mgCharges || updateData.mgCharges || 0;
+    }
+
     const record = await LoadBoard.findOneAndUpdate(
       { _id: id, createdBy: userId },
       updateData,
       { new: true, runValidators: true }
-    );
+    ).lean();
 
     if (!record) {
       return res.status(404).json({
@@ -164,6 +210,7 @@ exports.updateLoadBoardRecord = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Internal server error while updating load board record",
+      error: error.message,
     });
   }
 };
