@@ -55,6 +55,12 @@ class UserService {
     if (!user) {
       throw new Error("User not found");
     }
+    
+    // Prevent deletion of admin users
+    if (user.role === 'admin') {
+      throw new Error("Cannot delete admin users. Admin accounts are protected.");
+    }
+    
     await User.findByIdAndDelete(userId);
     return { message: "User deleted successfully" };
   }
