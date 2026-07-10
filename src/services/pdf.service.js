@@ -1,20 +1,14 @@
 const pdf = require("html-pdf-node");
 const axios = require("axios");
 const { uploadPDFBufferToCloudinary } = require("./cloudinary.service");
+const { generateInvoicePdfHtml } = require("./pdf-template.service");
 
 const generateInvoicePDF = async (invoice) => {
   const fileName = `invoice-${invoice.invoiceNumber}.pdf`;
 
   try {
-    // Get HTML template from frontend API (single source of truth)
-    const frontendUrl = process.env.FRONTEND_URL?.split(',')[0] || 'http://localhost:3000';
-    const response = await axios.post(`${frontendUrl}/api/generate-invoice-html`, invoice);
-    
-    if (!response.data.success) {
-      throw new Error("Failed to generate invoice HTML from frontend");
-    }
-    
-    const html = response.data.html;
+    // Generate HTML template directly in backend (no frontend dependency)
+    const html = generateInvoicePdfHtml(invoice);
 
     const file = { content: html };
     const options = {

@@ -168,7 +168,8 @@ exports.updateInvoiceStatus = async (req, res) => {
         console.log(`📧 Recipients: ${JSON.stringify(recipientsList)}`);
 
         if (recipientsList.length > 0) {
-          await sendInvoiceEmail(recipientsList, pdfPath, updatedInvoice.invoiceNumber, null, null, updatedInvoice);
+          // Pass the full invoice object to generate email HTML with all details
+          await sendInvoiceEmail(recipientsList, pdfPath, updatedInvoice.invoiceNumber, null, null, updatedInvoice.toObject());
           
           updatedInvoice.emailStatus = "sent";
           updatedInvoice.emailSentAt = new Date();

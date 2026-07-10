@@ -2,21 +2,18 @@ const nodemailer = require("nodemailer");
 const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
+const { generateInvoiceEmailHtml } = require("./email-template.service");
 
-// Get email-safe HTML from frontend API
-const getEmailHtmlFromFrontend = async (invoice, type = "invoice") => {
+// Get email-safe HTML directly without frontend dependency
+const getEmailHtmlFromBackend = async (invoice, type = "invoice") => {
   try {
-    const frontendUrl = process.env.FRONTEND_URL?.split(',')[0] || 'http://localhost:3000';
-    const endpoint = type === "appointment" ? "/api/generate-appointment-email" : "/api/generate-invoice-email";
-    const response = await axios.post(`${frontendUrl}${endpoint}`, invoice);
-    
-    if (!response.data.success) {
-      throw new Error("Failed to generate email HTML from frontend");
+    if (type === "invoice") {
+      return generateInvoiceEmailHtml(invoice);
     }
-    
-    return response.data.html;
+    // For appointments, you can add a similar service
+    throw new Error("Appointment emails not yet implemented in backend");
   } catch (error) {
-    console.error("Error getting email HTML from frontend:", error);
+    console.error("Error generating email HTML:", error);
     throw error;
   }
 };
@@ -67,9 +64,9 @@ const sendInvoiceEmail = async (emailsList, pdfPath, invoiceNumber, customSubjec
       try {
         // Use invoiceData if available, otherwise just send invoiceNumber
         const emailData = invoiceData || { invoiceNumber };
-        html = await getEmailHtmlFromFrontend(emailData, "invoice");
+        html = await getEmailHtmlFromBackend(emailData, "invoice");
       } catch (error) {
-        console.error("Failed to get email HTML from frontend, using simple fallback:", error);
+        console.error("Failed to generate email HTML, using simple fallback:", error);
         // Simple fallback without any PDF styling
         html = `
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-family: Arial, sans-serif; color: #1e293b; max-width: 600px; margin: 0 auto;">
