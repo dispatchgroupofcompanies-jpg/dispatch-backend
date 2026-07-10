@@ -130,6 +130,9 @@ exports.updateInvoiceStatus = async (req, res) => {
     }
 
     // Send email when invoice is approved
+    let emailSent = false;
+    let emailError = null;
+    
     if (status === "approved") {
       try {
         console.log(`📧 Attempting to send approval email for invoice: ${updatedInvoice.invoiceNumber}`);
@@ -171,6 +174,7 @@ exports.updateInvoiceStatus = async (req, res) => {
           updatedInvoice.emailSentAt = new Date();
           await updatedInvoice.save();
           
+          emailSent = true;
           console.log(`✅ Email sent successfully for invoice: ${updatedInvoice.invoiceNumber}`);
         } else {
           console.warn(`⚠️ No recipients found for invoice: ${updatedInvoice.invoiceNumber}`);
@@ -179,12 +183,20 @@ exports.updateInvoiceStatus = async (req, res) => {
         console.error("❌ Email delivery failed:", mailErr);
         console.error("Error details:", mailErr.message);
         if (mailErr.code) console.error("Error code:", mailErr.code);
+        emailError = mailErr;
+        // Don't throw - we still want to return success for the status update
       }
     }
 
+    const responseMessage = emailError 
+      ? `Invoice status updated to ${status} successfully! However, email notification failed to send.`
+      : emailSent 
+        ? `Invoice status updated to ${status} successfully! Approval email sent.`
+        : `Invoice status updated to ${status} successfully!`;
+
     res.status(200).json({
       success: true,
-      message: `Invoice status updated to ${status} successfully!`,
+      message: responseMessage,
       data: updatedInvoice,
     });
   } catch (error) {
