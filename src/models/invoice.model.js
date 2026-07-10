@@ -14,7 +14,7 @@ const tripSchema = new mongoose.Schema(
     loadId1: {
       type: String,
       trim: true,
-      required: true,
+      required: false,
       validate: {
         validator: function (value) {
           return value && value.trim().length > 0;

@@ -298,12 +298,11 @@ const downloadInvoicePDF = async (req, res) => {
   }
 };
 
-// 7. UPDATE STATUS & DISPATCH EMAIL
+// 7. UPDATE STATUS (NO EMAIL - Email is handled by admin controller)
 const updateInvoiceStatus = async (req, res) => {
   try {
     const { invoiceId } = req.params;
     const { invoiceStatus } = req.body;
-    console.lo('hello world');
 
     if (!invoiceStatus) {
       return res.status(400).json({
@@ -329,40 +328,7 @@ const updateInvoiceStatus = async (req, res) => {
     invoice.invoiceStatus = normalizedStatus;
     await invoice.save();
 
-    if (normalizedStatus === "paid" || normalizedStatus === "approved") {
-      const pdfPath = invoice.pdfUrl || ""; 
-      const recipientsList = [
-        invoice.customer?.email,
-        invoice.payee?.email,
-        "xcdgoc@gmail.com"
-      ].filter(Boolean);
-
-      console.log("📧 EMAIL TRIGGER - Status:", normalizedStatus);
-      console.log("📧 EMAIL TRIGGER - PDF URL:", pdfPath);
-      console.log("📧 EMAIL TRIGGER - Recipients:", recipientsList);
-      console.log("📧 EMAIL TRIGGER - Invoice Number:", invoice.invoiceNumber);
-
-      if (recipientsList.length > 0) {
-        try {
-      console.log("📧 EMAIL TRIGGER - Starting email send...");
-      await sendInvoiceEmail(recipientsList, pdfPath, invoice.invoiceNumber, null, null, invoice);
-      
-      invoice.emailStatus = "sent";
-      invoice.emailSentAt = new Date();
-      await invoice.save();
-      console.log("✅ EMAIL TRIGGER - Email sent successfully");
-        } catch (mailErr) {
-          invoice.emailStatus = "failed";
-          await invoice.save();
-          console.error("❌ EMAIL TRIGGER - Email delivery failed:", mailErr.message);
-          console.error("❌ EMAIL TRIGGER - Full error:", mailErr);
-        }
-      } else {
-        console.log("⚠️ EMAIL TRIGGER - No recipient list registered.");
-      }
-    } else {
-      console.log("ℹ️ EMAIL TRIGGER - Status is not 'paid' or 'approved':", normalizedStatus);
-    }
+    console.log("✅ INVOICE STATUS - Updated to:", normalizedStatus, "for invoice:", invoice.invoiceNumber);
 
     return res.status(200).json({
       success: true,
