@@ -57,7 +57,8 @@ const createInvoice = async (req, res) => {
         email: req.user.email || "N/A",
         phone: req.user.phone || "N/A",
         address1: req.user.address || "N/A",
-        eTransfer: data.eTransfer || "N/A"
+        eTransfer: data.eTransfer || "N/A",
+        institutionNumber: data.institutionNumber || "N/A"
       };
     }
 

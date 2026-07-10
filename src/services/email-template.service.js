@@ -96,6 +96,46 @@ const generateInvoiceEmailHtml = (invoice) => {
               </tr>
             </table>
 
+            <!-- Company Details Section -->
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 20px;">
+              <tr>
+                <td style="padding: 12px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                      <td style="width: 50%; vertical-align: top; padding-right: 20px;">
+                        <div style="font-size: 11px; text-transform: uppercase; color: #64748b; margin: 0 0 6px 0; font-weight: bold; letter-spacing: 0.5px;">EXTREME LOGISTICS INVOICE FROM:</div>
+                        <div>
+                          <span style="font-size: 14px; font-weight: bold; color: #dc2626; display: block; margin-bottom: 2px; text-transform: uppercase;">${invoice.payee?.companyName || invoice.payee?.customerName || "N/A"}</span>
+                          <div style="color: #475569; font-size: 12px; line-height: 1.3; text-transform: uppercase;">
+                            ${invoice.payee?.address1 || invoice.payee?.address || "N/A"}
+                          </div>
+                          <div style="margin-top: 4px; color: #475569; font-size: 12px; line-height: 1.35;">
+                            <b>Phone:</b> ${invoice.payee?.phone || "N/A"}<br/>
+                            <b>Email:</b> ${invoice.payee?.email || "N/A"}<br/>
+                            <b>GST/HST:</b> ${maskGstNumber(invoice.payee?.gstNumber)}
+                          </div>
+                        </div>
+                      </td>
+                      <td style="width: 50%; vertical-align: top; padding-left: 20px;">
+                        <div style="font-size: 11px; text-transform: uppercase; color: #64748b; margin: 0 0 6px 0; font-weight: bold; letter-spacing: 0.5px;">INVOICE TO:</div>
+                        <div>
+                          <span style="font-size: 14px; font-weight: bold; color: #2563eb; display: block; margin-bottom: 2px;">${invoice.customer?.companyName || invoice.customer?.customerName || "N/A"}</span>
+                          <div style="color: #475569; font-size: 12px; line-height: 1.3; text-transform: uppercase;">
+                            ${invoice.customer?.address1 || invoice.customer?.address || "N/A"}
+                          </div>
+                          <div style="margin-top: 4px; color: #475569; font-size: 12px; line-height: 1.35;">
+                            <b>Phone:</b> ${invoice.customer?.phone || "N/A"}<br/>
+                            <b>Email:</b> ${invoice.customer?.email || "N/A"}<br/>
+                            <b>GST/HST:</b> ${maskGstNumber(invoice.customer?.gstNumber)}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+
             <!-- Greeting -->
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top: 20px; margin-bottom: 20px;">
               <tr>
@@ -166,7 +206,7 @@ const generateInvoiceEmailHtml = (invoice) => {
                     }
                     <tr>
                       <td colspan="2" style="padding: 2px 0 2px 10px; font-size: 11px; color: #dc2626; line-height: 1.4;">
-                        VOID CHEQUE ${invoice.accountNumber ? `<br/><span style="color: #475569; font-weight: normal; font-size: 10px;">Transit: ${invoice.transitNumber || "115000"} | Acct: ${invoice.accountNumber}</span>` : ""}
+                        VOID CHEQUE ${invoice.accountNumber ? `<br/><span style="color: #475569; font-weight: normal; font-size: 10px;">Institution: ${invoice.institutionNumber || "003"} | Transit: ${invoice.transitNumber || "115000"} | Acct: ${invoice.accountNumber}</span>` : ""}
                       </td>
                     </tr>
                   </table>

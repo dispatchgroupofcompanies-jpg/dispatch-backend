@@ -245,7 +245,7 @@ const generateInvoicePdfHtml = (invoice) => {
                   <div style="margin-top: 4px; color: #475569; font-size: 12px; line-height: 1.35;">
                     <b>Phone:</b> ${invoice.customer?.phone || "N/A"}<br/>
                     <b>Email:</b> ${invoice.customer?.email || "N/A"}<br/>
-                    <b>GST/HST:</b> ${invoice.customer?.gstNumber || "N/A"}
+                    <b>GST/HST:</b> ${maskGstNumber(invoice.customer?.gstNumber)}
                   </div>
                 </div>
               </td>
@@ -274,15 +274,11 @@ const generateInvoicePdfHtml = (invoice) => {
             <tr>
               <td style="width: 50%;"></td>
               <td style="width: 50%; vertical-align: top;">
-                <table style="width: 100%; border-collapse: collapse; background-color: #f8fafc; border-top: 3px solid #102a63; padding: 10px;">
-                  <tr>
-                    <td style="padding: 6px 8px; font-size: 11px; font-weight: bold; color: #dc2626; text-transform: uppercase; width: 50%;">DISPATCH CHARGES</td>
-                    <td style="padding: 6px 8px; font-size: 12px; font-weight: bold; text-align: right; color: #dc2626;">${formatCurrency(invoice.dispatchTotal || invoice.trips?.reduce((acc, t) => acc + (t.dispatchAmount || 0), 0) || 0)}</td>
-                  </tr>
-                  <tr style="border-bottom: 1px solid #e2e8f0;">
-                    <td style="padding: 6px 8px; font-size: 11px; font-weight: bold; color: #dc2626; text-transform: uppercase;">GRAND TOTAL</td>
-                    <td style="padding: 6px 8px; font-size: 14px; font-weight: bold; text-align: right; color: #1e293b; white-space: nowrap;">${formatCurrency(invoice.grandTotal)}</td>
-                  </tr>
+                  <table style="width: 100%; border-collapse: collapse; background-color: #f8fafc; border-top: 3px solid #102a63; padding: 10px;">
+                    <tr style="border-bottom: 1px solid #e2e8f0;">
+                      <td style="padding: 6px 8px; font-size: 11px; font-weight: bold; color: #dc2626; text-transform: uppercase;">GRAND TOTAL</td>
+                      <td style="padding: 6px 8px; font-size: 14px; font-weight: bold; text-align: right; color: #1e293b; white-space: nowrap;">${formatCurrency(invoice.grandTotal)}</td>
+                    </tr>
                   <tr>
                     <td colspan="2" style="padding: 8px 8px 4px 8px; font-size: 11px; font-weight: bold; color: #dc2626; text-transform: uppercase;">DEPOSIT DETAILS</td>
                   </tr>
@@ -299,7 +295,7 @@ const generateInvoicePdfHtml = (invoice) => {
                   }
                   <tr>
                     <td colspan="2" style="padding: 2px 8px 6px 18px; font-size: 11px; color: #dc2626; line-height: 1.4;">
-                      VOID CHEQUE ${invoice.accountNumber ? `<br/><span style="color: #475569; font-weight: normal; font-size: 10px;">Transit: ${invoice.transitNumber || "115000"} | Acct: ${invoice.accountNumber}</span>` : ""}
+                      VOID CHEQUE ${invoice.accountNumber ? `<br/><span style="color: #475569; font-weight: normal; font-size: 10px;">Institution: ${invoice.institutionNumber || "003"} | Transit: ${invoice.transitNumber || "115000"} | Acct: ${invoice.accountNumber}</span>` : ""}
                     </td>
                   </tr>
                 </table>

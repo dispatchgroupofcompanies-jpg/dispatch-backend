@@ -18,6 +18,53 @@ const getEmailHtmlFromBackend = async (invoice, type = "invoice") => {
   }
 };
 
+// Create email transporter based on environment
+const createEmailTransporter = async () => {
+  const emailService = process.env.EMAIL_SERVICE || 'gmail';
+  
+  console.log(`📧 Using email service: ${emailService}`);
+
+  if (emailService === 'sendgrid') {
+    // SendGrid Configuration (for production/Render)
+    if (!process.env.SENDGRID_API_KEY) {
+      throw new Error("SENDGRID_API_KEY is required when using SendGrid");
+    }
+    
+    console.log("📧 Configuring SendGrid transporter...");
+    const transporter = nodemailer.createTransport({
+      host: "smtp.sendgrid.net",
+      port: 587,
+      secure: false,
+      auth: {
+        user: "apikey",  // SendGrid uses "apikey" as username
+        pass: process.env.SENDGRID_API_KEY,
+      },
+    });
+    
+    await transporter.verify();
+    console.log("✅ SendGrid transporter verified");
+    return transporter;
+  } else {
+    // Gmail Configuration (for local development)
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      throw new Error("EMAIL_USER and EMAIL_PASS are required for Gmail");
+    }
+
+    console.log(`📧 Configuring Gmail transporter for: ${process.env.EMAIL_USER}`);
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    await transporter.verify();
+    console.log("✅ Gmail transporter verified");
+    return transporter;
+  }
+};
+
 // Enhanced email function that supports both invoice and appointment emails
 // invoiceData is optional - if provided, it will be used to generate email body with full details
 const sendInvoiceEmail = async (emailsList, pdfPath, invoiceNumber, customSubject, customHtml, invoiceData = null) => {
@@ -29,29 +76,31 @@ const sendInvoiceEmail = async (emailsList, pdfPath, invoiceNumber, customSubjec
     console.log(`📧 PDF Path: ${pdfPath}`);
     console.log(`📧 Has PDF: ${pdfPath ? 'Yes' : 'No'}`);
 
-    // Check environment variables
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-      const missingVars = [];
-      if (!process.env.EMAIL_USER) missingVars.push("EMAIL_USER");
-      if (!process.env.EMAIL_PASS) missingVars.push("EMAIL_PASS");
-      throw new Error(`Missing environment variables: ${missingVars.join(", ")}`);
+    // Check environment variables based on email service
+    const emailService = process.env.EMAIL_SERVICE || 'gmail';
+    
+    if (emailService === 'sendgrid') {
+      // SendGrid only needs EMAIL_USER and SENDGRID_API_KEY
+      if (!process.env.EMAIL_USER) {
+        throw new Error("EMAIL_USER is required for SendGrid");
+      }
+      if (!process.env.SENDGRID_API_KEY) {
+        throw new Error("SENDGRID_API_KEY is required for SendGrid");
+      }
+    } else {
+      // Gmail needs EMAIL_USER and EMAIL_PASS
+      if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+        const missingVars = [];
+        if (!process.env.EMAIL_USER) missingVars.push("EMAIL_USER");
+        if (!process.env.EMAIL_PASS) missingVars.push("EMAIL_PASS");
+        throw new Error(`Missing environment variables: ${missingVars.join(", ")}`);
+      }
     }
 
-    console.log(`📧 Creating transporter with user: ${process.env.EMAIL_USER}`);
-
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-
-    console.log("📧 Transporter created, verifying connection...");
+    console.log("📧 Creating email transporter...");
     
-    // Verify transporter connection
-    await transporter.verify();
-    console.log("✅ Transporter connection verified");
+    // Create transporter based on environment
+    const transporter = await createEmailTransporter();
 
     const finalRecipients = Array.isArray(emailsList) ? emailsList.join(", ") : emailsList;
     console.log(`📧 Final recipients: ${finalRecipients}`);
@@ -160,6 +209,20 @@ const sendInvoiceEmail = async (emailsList, pdfPath, invoiceNumber, customSubjec
     console.error("Error message:", error.message);
     if (error.code) console.error("Error code:", error.code);
     if (error.response) console.error("Error response:", error.response);
+    
+    // Provide helpful error messages for common issues
+    if (error.code === 'EAUTH') {
+      console.error("❌ AUTHENTICATION ERROR: Check EMAIL_USER and EMAIL_PASS in .env");
+      console.error("   For Gmail, you need to use an App Password (not your regular password)");
+      console.error("   Enable 2FA first, then create App Password at: https://myaccount.google.com/apppasswords");
+    } else if (error.code === 'ECONNECTION') {
+      console.error("❌ CONNECTION ERROR: Cannot connect to email server");
+      console.error("   Check your internet connection and email service settings");
+    } else if (error.message && error.message.includes('Invalid login')) {
+      console.error("❌ INVALID LOGIN: Email credentials are incorrect");
+      console.error("   For Gmail, make sure you're using an App Password, not your regular password");
+    }
+    
     throw error;
   }
 };
