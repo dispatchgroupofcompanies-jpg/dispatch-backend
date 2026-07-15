@@ -77,21 +77,17 @@ const generateInvoiceEmailHtml = (invoice) => {
     "Valued Customer";
 
   return `
-    <div style="position: relative; width: 100%; max-width: 600px; margin: 0 auto; overflow: hidden;">
-      <!-- Email Safe Diagonal Background Watermark -->
-      <div style="position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%) rotate(-35deg); font-family: Arial, sans-serif; font-size: 48px; font-weight: 900; color: rgba(148, 163, 184, 0.12); z-index: 0; pointer-events: none; white-space: nowrap; text-align: center; width: 100%;">
-        XCDGOC PVT LTD
-      </div>
-
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="position: relative; z-index: 1; font-family: Arial, sans-serif; color: #1e293b; background: transparent;">
+    <div style="width: 100%; max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; color: #1e293b;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
         <tr>
           <td style="padding: 20px;">
             <!-- Header -->
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
               <tr>
-                <td style="text-align: left; padding-bottom: 15px; border-bottom: 2px solid #102a63;">
-                  <h1 style="margin: 0; font-size: 24px; font-weight: 900; color: #0f2962; text-transform: uppercase;">INVOICE</h1>
-                  <p style="margin: 4px 0 0 0; font-size: 13px; color: #64748b;">Num: <strong>#${invoiceNumber}</strong></p>
+                <td style="padding-bottom: 15px; border-bottom: 3px solid #102a63;">
+                  <h1 style="margin: 0 0 5px 0; font-size: 22px; font-weight: 900; color: #0f2962; text-transform: uppercase;">XCDGOC PVT LTD</h1>
+                  <p style="margin: 0; font-size: 11px; color: #64748b; font-weight: 600;">Extreme Canada Dispatch Group of Companies</p>
+                  <p style="margin: 4px 0 0 0; font-size: 10px; color: #64748b;">Canada's Leading Dispatch Services Provider</p>
                 </td>
               </tr>
             </table>
@@ -141,7 +137,7 @@ const generateInvoiceEmailHtml = (invoice) => {
               <tr>
                 <td style="padding: 15px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px;">
                   <p style="margin: 0 0 10px 0; font-size: 14px; line-height: 1.5; color: #1e293b;">Hello ${customerName},</p>
-                  <p style="margin: 0; font-size: 14px; line-height: 1.5; color: #475569;">Please find attached your professional invoice as a PDF document.</p>
+                  <p style="margin: 0; font-size: 14px; line-height: 1.5; color: #475569;">Please find your invoice details below.</p>
                 </td>
               </tr>
             </table>
@@ -176,40 +172,37 @@ const generateInvoiceEmailHtml = (invoice) => {
                 : ""
             }
 
-            <!-- Right Aligned Pricing Summary -->
+            <!-- Pricing Summary Below Table -->
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 20px;">
               <tr>
-                <td width="40%"></td>
-                <td width="60%" style="background-color: #f8fafc; border-top: 3px solid #102a63; padding: 12px;">
+                <td style="padding: 15px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px;">
                   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                     <tr>
-                      <td style="padding: 4px 0; font-size: 11px; font-weight: bold; color: #dc2626; text-transform: uppercase;">DISPATCH CHARGES</td>
-                      <td style="padding: 4px 0; font-size: 12px; font-weight: bold; text-align: right; color: #dc2626;">${dispatchTotal}</td>
+                      <td style="padding: 6px 0; font-size: 12px; font-weight: bold; color: #dc2626; text-transform: uppercase;">DISPATCH CHARGES</td>
+                      <td style="padding: 6px 0; font-size: 13px; font-weight: bold; text-align: right; color: #dc2626;">${dispatchTotal}</td>
                     </tr>
-                    <tr style="border-bottom: 1px solid #e2e8f0;">
-                      <td style="padding: 4px 0; font-size: 11px; font-weight: bold; color: #dc2626; text-transform: uppercase;">GRAND TOTAL</td>
-                      <td style="padding: 4px 0; font-size: 14px; font-weight: bold; text-align: right; color: #1e293b; white-space: nowrap;">${grandTotal}</td>
-                    </tr>
-                    <tr>
-                      <td colspan="2" style="padding: 8px 0 2px 0; font-size: 11px; font-weight: bold; color: #dc2626; text-transform: uppercase;">DEPOSIT DETAILS</td>
-                    </tr>
-                    ${
-                      eTransferAddress
-                        ? `
-                    <tr>
-                      <td colspan="2" style="padding: 2px 0 2px 10px; font-size: 11px; color: #dc2626;">
-                        e-transfer: <span style="color: #475569; font-weight: bold;">${eTransferAddress}</span>
-                      </td>
-                    </tr>
-                    `
-                        : ""
-                    }
-                    <tr>
-                      <td colspan="2" style="padding: 2px 0 2px 10px; font-size: 11px; color: #dc2626; line-height: 1.4;">
-                        VOID CHEQUE ${invoice.accountNumber ? `<br/><span style="color: #475569; font-weight: normal; font-size: 10px;">Institution: ${invoice.institutionNumber || "003"} | Transit: ${invoice.transitNumber || "115000"} | Acct: ${invoice.accountNumber}</span>` : ""}
-                      </td>
+                    <tr style="border-bottom: 2px solid #102a63;">
+                      <td style="padding: 8px 0; font-size: 13px; font-weight: bold; color: #dc2626; text-transform: uppercase;">GRAND TOTAL</td>
+                      <td style="padding: 8px 0; font-size: 16px; font-weight: bold; text-align: right; color: #1e293b; white-space: nowrap;">${grandTotal}</td>
                     </tr>
                   </table>
+                </td>
+              </tr>
+            </table>
+
+            <!-- Deposit Details Below Grand Total -->
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 20px;">
+              <tr>
+                <td style="padding: 15px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px;">
+                  <p style="margin: 0 0 10px 0; font-size: 12px; font-weight: bold; color: #dc2626; text-transform: uppercase;">DEPOSIT DETAILS</p>
+                  ${eTransferAddress ? `
+                  <p style="margin: 0 0 6px 0; font-size: 11px; color: #475569; line-height: 1.5;">
+                    <span style="color: #dc2626; font-weight: bold;">e-transfer:</span> <span style="color: #475569; font-weight: bold;">${eTransferAddress}</span>
+                  </p>
+                  ` : ""}
+                  <p style="margin: 0; font-size: 11px; color: #dc2626; line-height: 1.5;">
+                    VOID CHEQUE${invoice.accountNumber ? `<br/><span style="color: #475569; font-weight: normal; font-size: 10px;">Institution: ${invoice.institutionNumber || "003"} | Transit: ${invoice.transitNumber || "115000"} | Acct: ${invoice.accountNumber}</span>` : ""}
+                  </p>
                 </td>
               </tr>
             </table>
@@ -233,9 +226,6 @@ const generateInvoiceEmailHtml = (invoice) => {
                 </td>
               </tr>
             </table>
-          </td>
-        </tr>
-      </table>
     </div>
   `;
 };

@@ -218,40 +218,6 @@ const generateInvoicePdfHtml = (invoice) => {
             <span class="invoice-number">Num: <b>#${invoice.invoiceNumber || "N/A"}</b></span>
           </div>
 
-          <!-- Grand Total & Deposit Details Card (TOP RIGHT) -->
-          <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
-            <tr>
-              <td style="width: 50%;"></td>
-              <td style="width: 50%; vertical-align: top;">
-                <table style="width: 100%; border-collapse: collapse; background-color: #f8fafc; border-top: 3px solid #102a63; border-bottom: 3px solid #102a63; padding: 10px;">
-                  <tr style="border-bottom: 1px solid #e2e8f0;">
-                    <td style="padding: 6px 8px; font-size: 11px; font-weight: bold; color: #dc2626; text-transform: uppercase; letter-spacing: 0.5px;">GRAND TOTAL</td>
-                    <td style="padding: 6px 8px; font-size: 14px; font-weight: bold; text-align: right; color: #1e293b; white-space: nowrap;">${formatCurrency(invoice.grandTotal)}</td>
-                  </tr>
-                  <tr>
-                    <td colspan="2" style="padding: 8px 8px 4px 8px; font-size: 11px; font-weight: bold; color: #dc2626; text-transform: uppercase; letter-spacing: 0.5px;">DEPOSIT DETAILS</td>
-                  </tr>
-                  ${
-                    eTransferAddress
-                      ? `
-                  <tr>
-                    <td colspan="2" style="padding: 2px 8px 6px 18px; font-size: 11px; color: #dc2626; line-height: 1.4;">
-                      ${invoice.accountNumber ? `<span style="font-weight: bold; text-transform: uppercase;">VOID CHEQUE:</span> <span style="color: #475569; font-weight: normal; font-size: 10px; text-transform: uppercase;">Institution: ${invoice.institutionNumber || "003"} | Transit: ${invoice.transitNumber || "115000"} | Acct: ${invoice.accountNumber}</span>` : ""}
-                    </td>
-                  </tr>
-                  `
-                      : ""
-                  }
-                  <tr>
-                    <td colspan="2" style="padding: 2px 8px 6px 18px; font-size: 11px; color: #dc2626; line-height: 1.4;">
-                      <span style="font-weight: bold; text-transform: uppercase;">VOID CHEQUE</span>${invoice.accountNumber ? `<br/><span style="color: #475569; font-weight: normal; font-size: 10px; text-transform: uppercase; display: flex; flex-direction: row; gap: 15px; flex-wrap: wrap;"><span>Institution: ${invoice.institutionNumber || "003"}</span><span>Transit: ${invoice.transitNumber || "115000"}</span><span>Acct: ${invoice.accountNumber}</span></span>` : ""}
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-
           <!-- Company Details Section -->
           <table class="details-table" style="table-layout: fixed;">
             <tr>
@@ -303,6 +269,37 @@ const generateInvoicePdfHtml = (invoice) => {
             </tbody>
           </table>
 
+          <!-- Grand Total & Deposit Details Below Table -->
+          <table style="width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 15px;">
+            <tr>
+              <td style="width: 50%;"></td>
+              <td style="width: 50%; vertical-align: top;">
+                <table style="width: 100%; border-collapse: collapse; background-color: #f8fafc; border-top: 3px solid #102a63; border-bottom: 3px solid #102a63; padding: 10px;">
+                  <tr style="border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding: 6px 8px; font-size: 11px; font-weight: bold; color: #dc2626; text-transform: uppercase; letter-spacing: 0.5px;">GRAND TOTAL</td>
+                    <td style="padding: 6px 8px; font-size: 14px; font-weight: bold; text-align: right; color: #1e293b; white-space: nowrap;">${formatCurrency(invoice.grandTotal)}</td>
+                  </tr>
+                  <tr>
+                    <td colspan="2" style="padding: 8px 8px 4px 8px; font-size: 11px; font-weight: bold; color: #dc2626; text-transform: uppercase; letter-spacing: 0.5px;">DEPOSIT DETAILS</td>
+                  </tr>
+                  ${eTransferAddress ? `
+                  <tr>
+                    <td colspan="2" style="padding: 2px 8px 6px 18px; font-size: 11px; color: #dc2626; line-height: 1.5;">
+                      <span style="font-weight: bold; text-transform: uppercase;">E-TRANSFER:</span> <span style="color: #475569; font-weight: bold;">${eTransferAddress}</span>
+                    </td>
+                  </tr>
+                  ` : ""}
+                  ${invoice.accountNumber ? `
+                  <tr>
+                    <td colspan="2" style="padding: 2px 8px 6px 18px; font-size: 11px; color: #dc2626; line-height: 1.5;">
+                      <span style="font-weight: bold; text-transform: uppercase;">VOID CHEQUE:</span> <span style="color: #475569; font-weight: normal; font-size: 10px; text-transform: uppercase;">Institution: ${invoice.institutionNumber || "003"} | Transit: ${invoice.transitNumber || "115000"} | Acct: ${invoice.accountNumber}</span>
+                    </td>
+                  </tr>
+                  ` : ""}
+                </table>
+              </td>
+            </tr>
+          </table>
 
           <!-- Footer Band -->
           <div class="footer-band">
