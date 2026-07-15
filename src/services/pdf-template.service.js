@@ -131,7 +131,7 @@ const generateInvoicePdfHtml = (invoice) => {
           .details-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 45px;
+            margin-bottom: 20px;
           }
 
           .company-name-red {
@@ -154,7 +154,7 @@ const generateInvoicePdfHtml = (invoice) => {
           .items-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
           }
 
           .items-table thead tr {
@@ -175,12 +175,12 @@ const generateInvoicePdfHtml = (invoice) => {
             left: 0;
             right: 0;
             bottom: 0;
-            height: 44mm;
+            height: 40mm;
             background: #f8fafc;
             color: #64748b;
             border-top: 1px solid #e2e8f0;
             box-sizing: border-box;
-            padding: 8mm 15mm 8mm 15mm;
+            padding: 6mm 15mm 6mm 15mm;
           }
 
           .footer-brand {
@@ -217,6 +217,40 @@ const generateInvoicePdfHtml = (invoice) => {
             <h1 class="invoice-title">${dynamicInvoiceTitle}</h1>
             <span class="invoice-number">Num: <b>#${invoice.invoiceNumber || "N/A"}</b></span>
           </div>
+
+          <!-- Grand Total & Deposit Details Card (TOP RIGHT) -->
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
+            <tr>
+              <td style="width: 50%;"></td>
+              <td style="width: 50%; vertical-align: top;">
+                <table style="width: 100%; border-collapse: collapse; background-color: #f8fafc; border-top: 3px solid #102a63; border-bottom: 3px solid #102a63; padding: 10px;">
+                  <tr style="border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding: 6px 8px; font-size: 11px; font-weight: bold; color: #dc2626; text-transform: uppercase; letter-spacing: 0.5px;">GRAND TOTAL</td>
+                    <td style="padding: 6px 8px; font-size: 14px; font-weight: bold; text-align: right; color: #1e293b; white-space: nowrap;">${formatCurrency(invoice.grandTotal)}</td>
+                  </tr>
+                  <tr>
+                    <td colspan="2" style="padding: 8px 8px 4px 8px; font-size: 11px; font-weight: bold; color: #dc2626; text-transform: uppercase; letter-spacing: 0.5px;">DEPOSIT DETAILS</td>
+                  </tr>
+                  ${
+                    eTransferAddress
+                      ? `
+                  <tr>
+                    <td colspan="2" style="padding: 2px 8px 6px 18px; font-size: 11px; color: #dc2626; line-height: 1.4;">
+                      ${invoice.accountNumber ? `<span style="font-weight: bold; text-transform: uppercase;">VOID CHEQUE:</span> <span style="color: #475569; font-weight: normal; font-size: 10px; text-transform: uppercase;">Institution: ${invoice.institutionNumber || "003"} | Transit: ${invoice.transitNumber || "115000"} | Acct: ${invoice.accountNumber}</span>` : ""}
+                    </td>
+                  </tr>
+                  `
+                      : ""
+                  }
+                  <tr>
+                    <td colspan="2" style="padding: 2px 8px 6px 18px; font-size: 11px; color: #dc2626; line-height: 1.4;">
+                      <span style="font-weight: bold; text-transform: uppercase;">VOID CHEQUE</span>${invoice.accountNumber ? `<br/><span style="color: #475569; font-weight: normal; font-size: 10px; text-transform: uppercase; display: flex; flex-direction: row; gap: 15px; flex-wrap: wrap;"><span>Institution: ${invoice.institutionNumber || "003"}</span><span>Transit: ${invoice.transitNumber || "115000"}</span><span>Acct: ${invoice.accountNumber}</span></span>` : ""}
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
 
           <!-- Company Details Section -->
           <table class="details-table" style="table-layout: fixed;">
@@ -269,39 +303,6 @@ const generateInvoicePdfHtml = (invoice) => {
             </tbody>
           </table>
 
-          <!-- Right-aligned Summary & Deposit Area -->
-          <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
-            <tr>
-              <td style="width: 50%;"></td>
-              <td style="width: 50%; vertical-align: top;">
-                  <table style="width: 100%; border-collapse: collapse; background-color: #f8fafc; border-top: 3px solid #102a63; padding: 10px;">
-                    <tr style="border-bottom: 1px solid #e2e8f0;">
-                      <td style="padding: 6px 8px; font-size: 11px; font-weight: bold; color: #dc2626; text-transform: uppercase;">GRAND TOTAL</td>
-                      <td style="padding: 6px 8px; font-size: 14px; font-weight: bold; text-align: right; color: #1e293b; white-space: nowrap;">${formatCurrency(invoice.grandTotal)}</td>
-                    </tr>
-                  <tr>
-                    <td colspan="2" style="padding: 8px 8px 4px 8px; font-size: 11px; font-weight: bold; color: #dc2626; text-transform: uppercase;">DEPOSIT DETAILS</td>
-                  </tr>
-                  ${
-                    eTransferAddress
-                      ? `
-                  <tr>
-                    <td colspan="2" style="padding: 2px 8px 2px 18px; font-size: 11px; color: #dc2626;">
-                      e-transfer: <span style="color: #475569; font-weight: bold;">${eTransferAddress}</span>
-                    </td>
-                  </tr>
-                  `
-                      : ""
-                  }
-                  <tr>
-                    <td colspan="2" style="padding: 2px 8px 6px 18px; font-size: 11px; color: #dc2626; line-height: 1.4;">
-                      VOID CHEQUE ${invoice.accountNumber ? `<br/><span style="color: #475569; font-weight: normal; font-size: 10px;">Institution: ${invoice.institutionNumber || "003"} | Transit: ${invoice.transitNumber || "115000"} | Acct: ${invoice.accountNumber}</span>` : ""}
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
 
           <!-- Footer Band -->
           <div class="footer-band">

@@ -78,7 +78,7 @@ app.use(cookieParser());
 app.use(morgan("dev"));
 
 // Apply general API rate limiting
-// app.use("/api", apiLimiter);
+app.use("/api", apiLimiter);
 
 // 4.5 STATIC FILE SERVING FOR UPLOADS
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
