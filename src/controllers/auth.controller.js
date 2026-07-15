@@ -33,11 +33,9 @@ exports.login = async (req, res) => {
       });
     }
 
-    // 4. Smart Password Verification Logic
     const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
     let isPasswordValid = false;
 
-    // Check karo ki kya DB mein abhi bhi purana/default '111111' ka hash save hai
     const isDBStillDefault = await bcrypt.compare("111111", admin.password);
 
     console.log("--- LOGIN SECURITY LOGS ---");
@@ -45,13 +43,10 @@ exports.login = async (req, res) => {
 
     if (isDBStillDefault) {
       console.log("⚠️ Account is using default setup. Allowing '111111' fallback.");
-      // Agar database mein default setup hai, toh '111111' string allow hogi
       if (password === "111111") {
         isPasswordValid = true;
       }
     } else {
-      console.log("🔒 Admin has already changed the password. Hardcoded '111111' is now DISABLED.");
-      // Ek baar admin ke password reset karne ke baad, sirf naya hashed password hi match hoga
       isPasswordValid = await bcrypt.compare(password, admin.password);
     }
     console.log("----------------------------");
@@ -73,7 +68,6 @@ exports.login = async (req, res) => {
 
     let deviceStatus = "approved"; // Default for backward compatibility
 
-    // Skip device approval for admin users
     if (admin.role !== "admin") {
       // For non-admin users, deviceId is required
       if (!deviceId || typeof deviceId !== "string" || deviceId.trim().length === 0) {
@@ -88,12 +82,7 @@ exports.login = async (req, res) => {
 
       const trimmedDeviceId = deviceId.trim();
       
-      console.log(`[DEVICE LOGIN] Checking device in database for user ${email}`);
-      console.log(`[DEVICE LOGIN] User ID: ${admin._id}`);
-      console.log(`[DEVICE LOGIN] Device ID: ${trimmedDeviceId}`);
-
-      // Find existing device request
-      let deviceRequest = await DeviceRequest.findOne({
+          let deviceRequest = await DeviceRequest.findOne({
         userId: admin._id,
         deviceId: trimmedDeviceId,
       });
@@ -116,10 +105,8 @@ exports.login = async (req, res) => {
         // Existing device - check status
         if (deviceRequest.status === "pending") {
           deviceStatus = "pending_approval";
-          console.log(`[DEVICE LOGIN] Device pending approval for user ${email}. Device ID: ${trimmedDeviceId.substring(0, 20)}...`);
         } else if (deviceRequest.status === "rejected") {
           deviceStatus = "access_denied";
-          console.log(`[DEVICE LOGIN] Access denied for user ${email}. Device ID: ${trimmedDeviceId.substring(0, 20)}... Status: rejected`);
         } else if (deviceRequest.status === "approved") {
           // Device is approved - verify it matches the current device
           deviceStatus = "approved";
@@ -183,7 +170,6 @@ exports.login = async (req, res) => {
       sameSite: "lax",
     });
 
-    // 7. Success Response Data Structure
     const responseData = {
       success: true,
       message: "Login successful",
