@@ -165,7 +165,6 @@ exports.updateInvoiceStatus = async (req, res) => {
           "xcdgoc@gmail.com"
         ].filter(Boolean);
         
-        console.log(`📧 Recipients: ${JSON.stringify(recipientsList)}`);
 
         if (recipientsList.length > 0) {
           // Pass the full invoice object to generate email HTML with all details

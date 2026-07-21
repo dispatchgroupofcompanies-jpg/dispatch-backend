@@ -16,7 +16,7 @@ const generateInvoiceNumber = async () => {
     }
   );
 
-  return `INV-${String(counter.sequence).padStart(6, "0")}`;
+  return String(counter.sequence);
 };
 
 module.exports = generateInvoiceNumber;

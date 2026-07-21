@@ -38,9 +38,6 @@ exports.login = async (req, res) => {
 
     const isDBStillDefault = await bcrypt.compare("111111", admin.password);
 
-    console.log("--- LOGIN SECURITY LOGS ---");
-    console.log(`Checking account: ${email}`);
-
     if (isDBStillDefault) {
       console.log("⚠️ Account is using default setup. Allowing '111111' fallback.");
       if (password === "111111") {
@@ -71,8 +68,7 @@ exports.login = async (req, res) => {
     if (admin.role !== "admin") {
       // For non-admin users, deviceId is required
       if (!deviceId || typeof deviceId !== "string" || deviceId.trim().length === 0) {
-        console.log(`[DEVICE LOGIN] ❌ No device ID provided for user ${email}`);
-        console.log(`[DEVICE LOGIN] Request body:`, JSON.stringify(req.body, null, 2));
+        
         return res.status(200).json({
           success: false,
           status: "device_id_required",
@@ -87,7 +83,6 @@ exports.login = async (req, res) => {
         deviceId: trimmedDeviceId,
       });
       
-      console.log(`[DEVICE LOGIN] Device request found:`, deviceRequest ? `YES (Status: ${deviceRequest.status})` : "NO - Creating new request");
 
       if (!deviceRequest) {
         // New device - create pending request

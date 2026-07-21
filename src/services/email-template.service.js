@@ -25,7 +25,7 @@ const maskGstNumber = (gstNumber) => {
 
 const generateInvoiceEmailHtml = (invoice) => {
   const tripsCount = invoice.trips?.length || 0;
-  const dynamicInvoiceTitle = tripsCount > 1 ? "INVOICE - T" : "INVOICE - 1";
+  const dynamicInvoiceTitle = `INVOICE - #${invoice.invoiceNumber || "N/A"}`;
   const eTransferAddress =
     invoice.customer?.eTransfer || invoice.payee?.eTransferAddress;
 
@@ -61,7 +61,6 @@ const generateInvoiceEmailHtml = (invoice) => {
     })
     .join("");
 
-  const invoiceNumber = invoice.invoiceNumber || "N/A";
   const grandTotal = formatCurrency(invoice.grandTotal);
   const dispatchTotal = formatCurrency(
     invoice.dispatchTotal ||

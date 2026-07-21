@@ -25,7 +25,7 @@ const maskGstNumber = (gstNumber) => {
 
 const generateInvoicePdfHtml = (invoice) => {
   const tripsCount = invoice.trips?.length || 0;
-  const dynamicInvoiceTitle = tripsCount > 1 ? "INVOICE - T" : "INVOICE - 1";
+  const dynamicInvoiceTitle = `INVOICE - #${invoice.invoiceNumber || "N/A"}`;
   const eTransferAddress =
     invoice.customer?.eTransfer || invoice.payee?.eTransferAddress;
 
@@ -215,7 +215,6 @@ const generateInvoicePdfHtml = (invoice) => {
           <!-- Header Section -->
           <div class="header-section">
             <h1 class="invoice-title">${dynamicInvoiceTitle}</h1>
-            <span class="invoice-number">Num: <b>#${invoice.invoiceNumber || "N/A"}</b></span>
           </div>
 
           <!-- Company Details Section -->
