@@ -4,7 +4,6 @@ const cookieParser = require("cookie-parser");
 const morgan = require("morgan");
 const path = require("path");
 const { apiLimiter } = require("./middleware/rateLimiter");
-const ipWhitelist = require("./middleware/ipWhitelist");
 
 const authRoutes = require("./routes/auth.routes");
 const connectDB = require("./config/db");
@@ -38,16 +37,7 @@ app.set("trust proxy", true);
 // 1. DATABASE CONNECTION
 connectDB();
 
-// 2. 🔥 IP WHITELIST MIDDLEWARE (MUST BE BEFORE CORS)
-// Enforce in production OR when ENABLE_IP_WHITELIST is explicitly set to "true"
-if (process.env.NODE_ENV === "production" || process.env.ENABLE_IP_WHITELIST === "true") {
-  console.log(`🔒 IP Whitelist middleware enabled (NODE_ENV=${process.env.NODE_ENV}, ENABLE_IP_WHITELIST=${process.env.ENABLE_IP_WHITELIST || "not set"})`);
-  app.use(ipWhitelist);
-} else {
-  console.log("ℹ️  IP Whitelist middleware disabled (development mode without ENABLE_IP_WHITELIST)");
-}
-
-// 3. 🔥 CORE CORS MIDDLEWARE (MUST BE ON TOP OF EVERYTHING)
+// 2. 🔥 CORE CORS MIDDLEWARE (MUST BE ON TOP OF EVERYTHING)
 const allowedOrigins = process.env.FRONTEND_URL 
   ? process.env.FRONTEND_URL.split(',').map(url => url.trim()).filter(url => url)
   : ["http://localhost:3000"];
