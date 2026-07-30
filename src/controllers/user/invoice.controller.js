@@ -17,24 +17,18 @@ exports.createInvoice = async (req, res) => {
     const calculateInvoice = require("../../services/invoiceCalculation.service");
     const calculated = calculateInvoice(data.trips);
 
-    // Ensure loadId1, loadId2 and driverName pass safely into the mapped calculated trips array
+    // Preserve mixed-case alphanumeric VRID and Load ID values exactly as entered.
     const finalizedTrips = calculated.trips.map((calculatedTrip, index) => {
       const originalTrip = data.trips[index];
       
-      const cleanVrid = originalTrip?.vrid ? String(originalTrip.vrid).trim().toUpperCase() : "";
+      const cleanVrid = originalTrip?.vrid ? String(originalTrip.vrid).trim() : "";
 
       return {
         ...calculatedTrip,
         vrid: cleanVrid,
-        loadId1: cleanVrid.startsWith("T") && originalTrip?.loadId1 
-          ? String(originalTrip.loadId1).trim() 
-          : originalTrip?.loadId1 || undefined,
-        loadId2: cleanVrid.startsWith("T") && originalTrip?.loadId2 
-          ? String(originalTrip.loadId2).trim() 
-          : originalTrip?.loadId2 || undefined,
-        driverName: cleanVrid.startsWith("T") && originalTrip?.driverName 
-          ? String(originalTrip.driverName).trim() 
-          : originalTrip?.driverName || undefined,
+        loadId1: originalTrip?.loadId1 ? String(originalTrip.loadId1).trim() : undefined,
+        loadId2: originalTrip?.loadId2 ? String(originalTrip.loadId2).trim() : undefined,
+        driverName: originalTrip?.driverName ? String(originalTrip.driverName).trim() : undefined,
         route: originalTrip?.route,
         pickup: originalTrip?.pickup,
         drop: originalTrip?.drop,
@@ -42,10 +36,12 @@ exports.createInvoice = async (req, res) => {
     });
 
     const generateInvoiceNumber = require("../../services/invoiceNumber.service");
-    const invoiceNumber = await generateInvoiceNumber();    
+    const generatedNumber = await generateInvoiceNumber(data.payee);
     const invoicePayload = {
       ...data,
-      invoiceNumber,
+      invoiceNumber: generatedNumber.invoiceNumber,
+      payeeKey: generatedNumber.payeeKey,
+      payeeSerialNumber: generatedNumber.serialNumber,
       trips: finalizedTrips,
       subtotal: calculated.subtotal,
       tax: calculated.tax,
@@ -64,9 +60,7 @@ exports.createInvoice = async (req, res) => {
     const invoice = await Invoice.create(invoicePayload);
 
     try {
-      await generateInvoicePDF(invoice);
-      
-      invoice.pdfUrl = `/uploads/invoices/invoice-${invoice.invoiceNumber}.pdf`;
+      invoice.pdfUrl = await generateInvoicePDF(invoice);
       await invoice.save();
     } catch (err) {
       console.error("❌ PDF Render Engine Exception encountered:", err.message);
@@ -172,7 +166,8 @@ exports.updateInvoice = async (req, res) => {
       });
     }
 
-    Object.assign(invoice, req.body);
+    const { invoiceNumber, payeeKey, payeeSerialNumber, payee, ...updates } = req.body;
+    Object.assign(invoice, updates);
 
     if (req.body.trips) {
       const calculateInvoice = require("../../services/invoiceCalculation.service");
@@ -183,9 +178,13 @@ exports.updateInvoice = async (req, res) => {
       invoice.grandTotal = result.grandTotal;
     }
 
+    // Persist edits before rendering so the generated PDF and its payee serial
+    // are based on the current document, not the previous saved version.
+    await invoice.save();
+
     // Regenerate PDF if data updated
     try {
-      await generateInvoicePDF(invoice);
+      invoice.pdfUrl = await generateInvoicePDF(invoice);
     } catch (pdfErr) {
       console.error("⚠️ PDF Refresh failed during update:", pdfErr.message);
     }

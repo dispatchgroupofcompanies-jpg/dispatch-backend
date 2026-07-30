@@ -25,7 +25,8 @@ const maskGstNumber = (gstNumber) => {
 
 const generateInvoicePdfHtml = (invoice) => {
   const tripsCount = invoice.trips?.length || 0;
-  const dynamicInvoiceTitle = `INVOICE - #${invoice.invoiceNumber || "N/A"}`;
+  const serialNumber = invoice.payeeSerialNumber ?? invoice.invoiceNumber ?? "N/A";
+  const dynamicInvoiceTitle = `INVOICE - #${serialNumber}`;
   const eTransferAddress =
     invoice.customer?.eTransfer || invoice.payee?.eTransferAddress;
 

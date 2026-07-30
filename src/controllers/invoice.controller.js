@@ -16,7 +16,7 @@ const createInvoice = async (req, res) => {
     }
 
     const calculated = calculateInvoice(trips);
-    const invoiceNumber = await generateInvoiceNumber();
+    const generatedNumber = await generateInvoiceNumber(payee);
 
     // Handle customer fallback
     const customerData = customer || (req.user ? {
@@ -32,10 +32,13 @@ const createInvoice = async (req, res) => {
     const invoice = await Invoice.create({
       ...data,
       customer: customerData,
-      invoiceNumber,
+      invoiceNumber: generatedNumber.invoiceNumber,
+      payeeKey: generatedNumber.payeeKey,
+      payeeSerialNumber: generatedNumber.serialNumber,
+      payee,
       trips: calculated.trips.map((trip, i) => ({
         ...trip,
-        vrid: trips[i]?.vrid ? String(trips[i].vrid).trim().toUpperCase() : "",
+        vrid: trips[i]?.vrid ? String(trips[i].vrid).trim() : "",
         loadId1: trips[i]?.loadId1 ? String(trips[i].loadId1).trim() : undefined,
         loadId2: trips[i]?.loadId2 ? String(trips[i].loadId2).trim() : undefined,
         driverName: trips[i]?.driverName ? String(trips[i].driverName).trim() : undefined,
@@ -129,7 +132,8 @@ const updateInvoice = async (req, res) => {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
-    Object.assign(invoice, req.body);
+    const { invoiceNumber, payeeKey, payeeSerialNumber, payee, ...updates } = req.body;
+    Object.assign(invoice, updates);
 
     if (req.body.trips) {
       const result = calculateInvoice(req.body.trips);
@@ -139,12 +143,15 @@ const updateInvoice = async (req, res) => {
       invoice.grandTotal = result.grandTotal;
     }
 
-    generateInvoicePDF(invoice).then(pdfUrl => {
-      invoice.pdfUrl = pdfUrl;
-      invoice.save();
-    }).catch(err => console.error("PDF generation failed:", err.message));
-
     await invoice.save();
+
+    try {
+      invoice.pdfUrl = await generateInvoicePDF(invoice);
+      await invoice.save();
+    } catch (pdfError) {
+      console.error("PDF generation failed:", pdfError.message);
+    }
+
     return res.json({ success: true, message: "Invoice updated", data: invoice });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -240,4 +247,4 @@ module.exports = {
   deleteInvoice,
   updateInvoiceStatus,
   downloadInvoicePDF
-}; 
+};

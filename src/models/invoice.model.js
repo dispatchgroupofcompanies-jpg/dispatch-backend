@@ -8,34 +8,18 @@ const mongoose = require("mongoose");
 const tripSchema = new mongoose.Schema(
   {
     tripDate: { type: Date, required: true },
-    vrid: { type: String, required: true, trim: true, uppercase: true },
-    
-    // Load ID 1 - always required
+    // Trip and load identifiers may contain any mix of letters, digits and
+    // punctuation. Preserve the value exactly as the dispatcher entered it.
+    vrid: { type: String, required: true, trim: true },
+
     loadId1: {
       type: String,
       trim: true,
-      required: false,
-      validate: {
-        validator: function (value) {
-          return value && value.trim().length > 0;
-        },
-        message: "Load ID 1 is required!",
-      },
     },
-    
-    // Load ID 2 - only required when VRID starts with T
+
     loadId2: {
       type: String,
       trim: true,
-      validate: {
-        validator: function (value) {
-          if (this.vrid && this.vrid.toUpperCase().startsWith("T")) {
-            return value && value.trim().length > 0;
-          }
-          return true; // Optional when VRID doesn't start with T
-        },
-        message: "Load ID 2 is required when VRID starts with 'T'!",
-      },
     },
     
     // Driver Name - always required
@@ -69,7 +53,11 @@ const tripSchema = new mongoose.Schema(
  */
 const invoiceSchema = new mongoose.Schema(
   {
-    invoiceNumber: { type: String, required: true, unique: true },
+    // `invoiceNumber` is the customer-facing serial number. It is unique only
+    // within the payee that issued the invoice.
+    invoiceNumber: { type: String, required: true },
+    payeeKey: { type: String, required: true, index: true },
+    payeeSerialNumber: { type: Number, required: true },
     invoiceType: {
       type: String,
       enum: ["single", "multiple", "Single", "Multiple"],
@@ -138,5 +126,9 @@ const invoiceSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// A payee owns its own invoice sequence, so the same serial can exist for
+// different payees but can never be repeated by the same one.
+invoiceSchema.index({ payeeKey: 1, payeeSerialNumber: 1 }, { unique: true });
 
 module.exports = mongoose.model("Invoice", invoiceSchema);

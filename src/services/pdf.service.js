@@ -1,6 +1,7 @@
 const pdf = require("html-pdf-node");
 const { uploadPDFBufferToCloudinary } = require("./cloudinary.service");
 const { generateInvoicePdfHtml } = require("./pdf-template.service");
+const { getPayeeSerialNumber } = require("./invoiceNumber.service");
 
 // Configure Puppeteer to use system-installed Chromium (optimized for VPS)
 const chromiumPath = process.env.PUPPETEER_EXECUTABLE_PATH || 
@@ -33,10 +34,15 @@ const generateInvoicePDF = async (invoice) => {
     throw new Error("Invalid invoice data");
   }
 
-  const fileName = `invoice-${invoice.invoiceNumber}.pdf`;
+  // Serial numbers repeat across payees, so storage names must include the
+  // document id to avoid one payee's PDF overwriting another's.
+  const fileName = `invoice-${invoice._id}-${invoice.payeeSerialNumber || invoice.invoiceNumber}.pdf`;
 
   try {
-    const html = generateInvoicePdfHtml(invoice);
+    const payeeSerialNumber = await getPayeeSerialNumber(invoice);
+    const invoiceForTemplate = invoice.toObject ? invoice.toObject() : { ...invoice };
+    invoiceForTemplate.payeeSerialNumber = payeeSerialNumber;
+    const html = generateInvoicePdfHtml(invoiceForTemplate);
     const pdfBuffer = await pdf.generatePdf({ content: html }, PDF_OPTIONS);
 
     const cloudinaryUrl = await uploadPDFBufferToCloudinary(pdfBuffer, fileName, "invoices");

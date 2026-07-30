@@ -3,6 +3,7 @@ const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
 const { generateInvoiceEmailHtml } = require("./email-template.service");
+const { getPayeeSerialNumber } = require("./invoiceNumber.service");
 
 // Get email-safe HTML directly without frontend dependency
 const getEmailHtmlFromBackend = async (invoice, type = "invoice") => {
@@ -70,9 +71,12 @@ const createEmailTransporter = async () => {
 const sendInvoiceEmail = async (emailsList, pdfPath, invoiceNumber, customSubject, customHtml, invoiceData = null) => {
 
   try {
+    const payeeSerialNumber = invoiceData
+      ? await getPayeeSerialNumber(invoiceData)
+      : invoiceNumber;
     console.log("📧 EMAIL SERVICE STARTED");
     console.log(`📧 To: ${JSON.stringify(emailsList)}`);
-    console.log(`📧 Subject: ${customSubject || `Invoice #${invoiceNumber}`}`);
+    console.log(`📧 Subject: ${customSubject || `Invoice #${payeeSerialNumber}`}`);
     console.log(`📧 PDF Path: ${pdfPath}`);
     console.log(`📧 Has PDF: ${pdfPath ? 'Yes' : 'No'}`);
 
@@ -106,13 +110,15 @@ const sendInvoiceEmail = async (emailsList, pdfPath, invoiceNumber, customSubjec
     console.log(`📧 Final recipients: ${finalRecipients}`);
 
     // Use custom subject/html if provided, otherwise get email-safe HTML from frontend
-    const subject = customSubject || `Invoice #${invoiceNumber} Generated — Dispatch Group`;
+    const subject = customSubject || `Invoice #${payeeSerialNumber} Generated — Dispatch Group`;
     let html = customHtml;
     
     if (!html) {
       try {
         // Use invoiceData if available, otherwise just send invoiceNumber
-        const emailData = invoiceData || { invoiceNumber };
+        const emailData = invoiceData
+          ? { ...invoiceData, payeeSerialNumber }
+          : { invoiceNumber: payeeSerialNumber, payeeSerialNumber };
         html = await getEmailHtmlFromBackend(emailData, "invoice");
       } catch (error) {
         console.error("Failed to generate email HTML, using simple fallback:", error);
@@ -122,7 +128,7 @@ const sendInvoiceEmail = async (emailsList, pdfPath, invoiceNumber, customSubjec
             <tr>
               <td style="padding: 20px; background-color: #ffffff;">
                 <h1 style="margin: 0; font-size: 20px; font-weight: bold; color: #1e3a8a; text-transform: uppercase;">INVOICE</h1>
-                <p style="margin: 4px 0 0 0; font-size: 12px; color: #64748b;">Invoice #: <strong>#${invoiceNumber}</strong></p>
+                <p style="margin: 4px 0 0 0; font-size: 12px; color: #64748b;">Invoice #: <strong>#${payeeSerialNumber}</strong></p>
                 <p style="margin: 20px 0 0 0; font-size: 14px; line-height: 1.5; color: #475569;">Please find attached your invoice as a PDF.</p>
               </td>
             </tr>
@@ -151,7 +157,7 @@ const sendInvoiceEmail = async (emailsList, pdfPath, invoiceNumber, customSubjec
           console.log("✅ PDF downloaded from Cloudinary to temp file");
           
           attachments = [{
-            filename: `invoice-${invoiceNumber}.pdf`,
+            filename: `invoice-${payeeSerialNumber}.pdf`,
             path: tempPath,
           }];
         } catch (downloadError) {
@@ -161,7 +167,7 @@ const sendInvoiceEmail = async (emailsList, pdfPath, invoiceNumber, customSubjec
       } else {
         // Local file path
         attachments = [{
-          filename: `invoice-${invoiceNumber}.pdf`,
+          filename: `invoice-${payeeSerialNumber}.pdf`,
           path: pdfPath,
         }];
       }
@@ -178,7 +184,7 @@ const sendInvoiceEmail = async (emailsList, pdfPath, invoiceNumber, customSubjec
       mailOptions.html = customHtml;
       mailOptions.text = "Please view this email in HTML format.";
     } else {
-      mailOptions.text = `Hello,\n\nPlease find attached your professional copy of Invoice #${invoiceNumber}.\n\nPayment Methods:\n- Direct Deposit: See attached PDF for banking details\n- E-Transfer: See attached PDF for E-Transfer email address\n\nThank you for your business!\n\n— Dispatch Group Billing Team`;
+      mailOptions.text = `Hello,\n\nPlease find attached your professional copy of Invoice #${payeeSerialNumber}.\n\nPayment Methods:\n- Direct Deposit: See attached PDF for banking details\n- E-Transfer: See attached PDF for E-Transfer email address\n\nThank you for your business!\n\n— Dispatch Group Billing Team`;
       mailOptions.html = html;
     }
 
