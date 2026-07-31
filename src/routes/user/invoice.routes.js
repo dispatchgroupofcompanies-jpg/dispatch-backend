@@ -5,6 +5,7 @@ const {
   createInvoice,
   getInvoiceList,
   getInvoiceById,
+  getInvoicePdfLink,
   updateInvoice,
   deleteInvoice,
   updateInvoiceStatus,
@@ -20,6 +21,7 @@ router.use(authenticate);
 router.post("/", createInvoice);
 router.get("/", getInvoiceList);
 router.get("/:invoiceId", getInvoiceById);
+router.get("/:invoiceId/pdf-link", getInvoicePdfLink);
 router.put("/:invoiceId", updateInvoice);
 router.delete("/:invoiceId", deleteInvoice);
 router.patch("/:invoiceId/status", updateInvoiceStatus);

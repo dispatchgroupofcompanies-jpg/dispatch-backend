@@ -19,7 +19,9 @@ cloudinary.config({
  */
 const uploadPDFBufferToCloudinary = async (pdfBuffer, fileName, folder = "invoices") => {
   try {
-    const publicId = path.basename(fileName, path.extname(fileName));
+    // Raw Cloudinary assets must include their extension in the public ID.
+    // This keeps the delivered link and downloaded file recognizably as a PDF.
+    const publicId = path.basename(fileName);
     
     // Use upload_stream for buffer upload
     const result = await new Promise((resolve, reject) => {
@@ -28,6 +30,7 @@ const uploadPDFBufferToCloudinary = async (pdfBuffer, fileName, folder = "invoic
           resource_type: "raw",
           folder: `dispatch/${folder}`,
           public_id: publicId,
+          filename_override: fileName,
           overwrite: true,
           access_mode: "public",
         },
@@ -67,7 +70,8 @@ const uploadPDFToCloudinary = async (localFilePath, folder = "invoices") => {
     const result = await cloudinary.uploader.upload(localFilePath, {
       resource_type: "raw",
       folder: `dispatch/${folder}`,
-      public_id: path.basename(localFilePath, path.extname(localFilePath)),
+      public_id: path.basename(localFilePath),
+      filename_override: path.basename(localFilePath),
       overwrite: true,
       access_mode: "public",
     });

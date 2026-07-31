@@ -135,6 +135,10 @@ const updateInvoice = async (req, res) => {
     const { invoiceNumber, payeeKey, payeeSerialNumber, payee, ...updates } = req.body;
     Object.assign(invoice, updates);
 
+    if (payee) {
+      invoice.payee = { ...invoice.payee.toObject(), ...payee };
+    }
+
     if (req.body.trips) {
       const result = calculateInvoice(req.body.trips);
       invoice.trips = result.trips;

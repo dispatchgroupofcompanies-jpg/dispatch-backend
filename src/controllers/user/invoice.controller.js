@@ -150,6 +150,36 @@ exports.getInvoiceById = async (req, res) => {
   }
 };
 
+// User: Generate a fresh public PDF link for sharing.
+exports.getInvoicePdfLink = async (req, res) => {
+  try {
+    const invoice = await Invoice.findById(req.params.invoiceId);
+    if (!invoice) {
+      return res.status(404).json({ success: false, message: "Invoice not found." });
+    }
+
+    if (invoice.createdBy?.toString() !== req.user?._id?.toString()) {
+      return res.status(403).json({ success: false, message: "Access denied." });
+    }
+
+    invoice.pdfUrl = await generateInvoicePDF(invoice);
+    await invoice.save();
+
+    return res.json({
+      success: true,
+      data: {
+        // Cloudinary is publicly reachable by the WhatsApp recipient, unlike
+        // a local backend URL such as http://localhost:5000.
+        pdfUrl: invoice.pdfUrl,
+        filename: `invoice-${invoice._id}-${invoice.payeeSerialNumber}.pdf`,
+      },
+    });
+  } catch (error) {
+    console.error("Failed to generate shareable PDF:", error);
+    return res.status(500).json({ success: false, message: "Failed to generate invoice PDF." });
+  }
+};
+
 // User: Update own invoice
 exports.updateInvoice = async (req, res) => {
   try {
@@ -168,6 +198,10 @@ exports.updateInvoice = async (req, res) => {
 
     const { invoiceNumber, payeeKey, payeeSerialNumber, payee, ...updates } = req.body;
     Object.assign(invoice, updates);
+
+    if (payee) {
+      invoice.payee = { ...invoice.payee.toObject(), ...payee };
+    }
 
     if (req.body.trips) {
       const calculateInvoice = require("../../services/invoiceCalculation.service");
