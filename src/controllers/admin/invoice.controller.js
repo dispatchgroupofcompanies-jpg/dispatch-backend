@@ -3,6 +3,7 @@ const path = require("path");
 const axios = require("axios");
 const sendInvoiceEmail = require("../../services/email.service");
 const generateInvoicePDF = require("../../services/pdf.service");
+const { generateInvoicePdfBuffer } = generateInvoicePDF;
 
 // Admin: Get all invoices with pagination and filters (with user-based access control)
 exports.getAllInvoices = async (req, res) => {
@@ -248,6 +249,14 @@ exports.downloadInvoicePDF = async (req, res) => {
     }
 
     const filename = `Invoice-${invoice.invoiceNumber}.pdf`;
+
+    // Cloudinary is rejecting raw-file delivery with a 401 ACL error. Send
+    // the generated PDF directly to this authenticated request instead.
+    const pdfBuffer = await generateInvoicePdfBuffer(invoice);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Length", pdfBuffer.length);
+    return res.send(pdfBuffer);
 
     try {
       // Always generate new PDF to ensure latest template is used

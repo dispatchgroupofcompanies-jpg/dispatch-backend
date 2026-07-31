@@ -29,6 +29,22 @@ const PDF_OPTIONS = {
   },
 };
 
+// Produce the PDF once for authenticated downloads, without relying on the
+// access policy of a subsequently delivered Cloudinary raw asset.
+const generateInvoicePdfBuffer = async (invoice) => {
+  if (!invoice || !invoice.invoiceNumber) {
+    throw new Error("Invalid invoice data");
+  }
+
+  const payeeSerialNumber = await getPayeeSerialNumber(invoice);
+  const invoiceForTemplate = invoice.toObject
+    ? invoice.toObject()
+    : { ...invoice };
+  invoiceForTemplate.payeeSerialNumber = payeeSerialNumber;
+  const html = generateInvoicePdfHtml(invoiceForTemplate);
+  return pdf.generatePdf({ content: html }, PDF_OPTIONS);
+};
+
 const generateInvoicePDF = async (invoice) => {
   if (!invoice || !invoice.invoiceNumber) {
     throw new Error("Invalid invoice data");
@@ -54,3 +70,4 @@ const generateInvoicePDF = async (invoice) => {
 };
 
 module.exports = generateInvoicePDF;
+module.exports.generateInvoicePdfBuffer = generateInvoicePdfBuffer;
