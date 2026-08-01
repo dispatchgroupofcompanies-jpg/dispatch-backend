@@ -4,13 +4,12 @@ const axios = require("axios");
 const sendInvoiceEmail = require("../../services/email.service");
 const generateInvoicePDF = require("../../services/pdf.service");
 const { generateInvoicePdfBuffer } = generateInvoicePDF;
+const { getPagination } = require("../../middleware/validation.middleware");
 
 // Admin: Get all invoices with pagination and filters (with user-based access control)
 exports.getAllInvoices = async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
+    const { page, limit, skip } = getPagination(req.query);
 
     const filter = {};
     
@@ -168,8 +167,17 @@ exports.updateInvoiceStatus = async (req, res) => {
         
 
         if (recipientsList.length > 0) {
-          // Pass the full invoice object to generate email HTML with all details
-          await sendInvoiceEmail(recipientsList, pdfPath, updatedInvoice.invoiceNumber, null, null, updatedInvoice.toObject());
+          // Attach the exact PDF produced from the backend invoice template.
+          // This never depends on Cloudinary allowing a subsequent download.
+          const pdfAttachment = await generateInvoicePdfBuffer(updatedInvoice);
+          await sendInvoiceEmail(
+            recipientsList,
+            pdfAttachment,
+            updatedInvoice.invoiceNumber,
+            null,
+            null,
+            updatedInvoice.toObject()
+          );
           
           updatedInvoice.emailStatus = "sent";
           updatedInvoice.emailSentAt = new Date();
@@ -185,6 +193,8 @@ exports.updateInvoiceStatus = async (req, res) => {
         console.error("Error details:", mailErr.message);
         if (mailErr.code) console.error("Error code:", mailErr.code);
         emailError = mailErr;
+        updatedInvoice.emailStatus = "failed";
+        await updatedInvoice.save();
         // Don't throw - we still want to return success for the status update
       }
     }

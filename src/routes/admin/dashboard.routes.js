@@ -7,9 +7,10 @@ const {
 } = require("../../controllers/admin/dashboard.controller.js");
 
 const authMiddleware = require("../../middleware/auth.middleware.js");
+const { requireAdmin } = require("../../middleware/authorize.middleware");
 
 // All admin routes require authentication
-router.use(authMiddleware);
+router.use(authMiddleware, requireAdmin);
 
 // Admin Dashboard Stats
 router.get("/stats", getDashboardStats);

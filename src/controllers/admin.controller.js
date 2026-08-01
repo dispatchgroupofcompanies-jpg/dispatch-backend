@@ -1,6 +1,7 @@
 const Admin = require("../models/user.model");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const { getJwtSecret } = require("../config/env");
 
 exports.resetAdminPassword = async (req, res) => {
   try {
@@ -32,10 +33,9 @@ exports.resetAdminPassword = async (req, res) => {
     }
 
     // Verify token and get admin ID
-    const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
     let decoded;
     try {
-      decoded = jwt.verify(token, JWT_SECRET);
+      decoded = jwt.verify(token, getJwtSecret());
     } catch (error) {
       return res.status(401).json({
         success: false,
@@ -68,8 +68,7 @@ exports.resetAdminPassword = async (req, res) => {
     }
 
     // Verify current password
-    const isHardcodedPassword = currentPassword === "111111";
-    const isPasswordMatch = isHardcodedPassword || await bcrypt.compare(currentPassword, admin.password);
+    const isPasswordMatch = await bcrypt.compare(currentPassword, admin.password);
 
     if (!isPasswordMatch) {
       return res.status(400).json({
@@ -110,10 +109,9 @@ exports.getAdminProfile = async (req, res) => {
       });
     }
 
-    const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
     let decoded;
     try {
-      decoded = jwt.verify(token, JWT_SECRET);
+      decoded = jwt.verify(token, getJwtSecret());
     } catch (error) {
       return res.status(401).json({
         success: false,

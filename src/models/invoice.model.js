@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const crypto = require("crypto");
 
 /**
  * -----------------------
@@ -78,6 +79,9 @@ const invoiceSchema = new mongoose.Schema(
   {
     invoiceNumber: {
       type: String,
+      required: true,
+      unique: true,
+      index: true,
     },
 
     payeeKey: {
@@ -87,6 +91,7 @@ const invoiceSchema = new mongoose.Schema(
 
     payeeSerialNumber: {
       type: Number,
+      default: 1,
     },
 
     invoiceType: {
@@ -98,6 +103,7 @@ const invoiceSchema = new mongoose.Schema(
       type: String,
       default: "draft",
       lowercase: true,
+      enum: ["draft", "pending", "approved", "rejected", "paid", "cancelled"],
     },
 
     currency: {
@@ -151,10 +157,20 @@ const invoiceSchema = new mongoose.Schema(
 
     pdfUrl: String,
 
+    shareToken: {
+      type: String,
+      unique: true,
+      sparse: true,
+      default: () => crypto.randomBytes(32).toString("hex"),
+    },
+
+    shareExpiresAt: Date,
+
     emailStatus: {
       type: String,
       default: "pending",
       lowercase: true,
+      enum: ["pending", "sent", "failed"],
     },
 
     emailSentAt: Date,
@@ -167,10 +183,18 @@ const invoiceSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },
+
+    invoicePeriod: {
+      startDate: Date,
+      endDate: Date,
+    },
   },
   {
     timestamps: true,
   }
 );
+
+invoiceSchema.index({ createdBy: 1, createdAt: -1 });
+invoiceSchema.index({ payeeKey: 1, payeeSerialNumber: 1 });
 
 module.exports = mongoose.model("Invoice", invoiceSchema);

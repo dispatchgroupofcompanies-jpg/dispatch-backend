@@ -1,7 +1,10 @@
 const Invoice = require("../../models/invoice.model");
+const crypto = require("crypto");
 const axios = require("axios");
+const generateInvoiceNumber = require("../../services/invoiceNumber.service");
 const generateInvoicePDF = require("../../services/pdf.service");
 const { generateInvoicePdfBuffer } = generateInvoicePDF;
+const { getPagination } = require("../../middleware/validation.middleware");
 
 const createInvoiceWithUniqueNumber = async (payload, maxRetries = 3) => {
   let attempt = 0;
@@ -13,7 +16,6 @@ const createInvoiceWithUniqueNumber = async (payload, maxRetries = 3) => {
       const isDuplicateInvoiceNumber = err.code === 11000 && err.keyPattern?.invoiceNumber;
       if (isDuplicateInvoiceNumber && attempt < maxRetries) {
         attempt += 1;
-        const generateInvoiceNumber = require("../../services/invoiceNumber.service");
         const newNumber = await generateInvoiceNumber(payload.payee);
         payload.invoiceNumber = newNumber.invoiceNumber;
         payload.payeeKey = newNumber.payeeKey;
@@ -125,9 +127,7 @@ exports.getInvoiceList = async (req, res) => {
       });
     }
 
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
+    const { page, limit, skip } = getPagination(req.query);
 
     // Only get invoices created by this user
     const filter = { createdBy: userId };
@@ -185,15 +185,20 @@ exports.getInvoicePdfLink = async (req, res) => {
       return res.status(403).json({ success: false, message: "Access denied." });
     }
 
+    if (!invoice.shareToken) {
+      invoice.shareToken = crypto.randomBytes(32).toString("hex");
+    }
     invoice.pdfUrl = await generateInvoicePDF(invoice);
     await invoice.save();
+
+    const sharePath = `/api/public/invoices/${invoice.shareToken}/pdf`;
+    const publicApiUrl = process.env.PUBLIC_API_URL?.replace(/\/$/, "");
 
     return res.json({
       success: true,
       data: {
-        // Cloudinary is publicly reachable by the WhatsApp recipient, unlike
-        // a local backend URL such as http://localhost:5000.
-        pdfUrl: invoice.pdfUrl,
+        // This backend URL is protected by a random, revocable share token.
+        pdfUrl: publicApiUrl ? `${publicApiUrl}${sharePath}` : sharePath,
         filename: `invoice-${invoice._id}-${invoice.payeeSerialNumber}.pdf`,
       },
     });

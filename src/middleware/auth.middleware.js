@@ -2,12 +2,11 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/user.model"); 
 const Admin = require("../models/admin.model");
 const addUser = require("../models/addUsers.js");
-
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
+const { getJwtSecret } = require("../config/env");
 const authMiddleware = async (req, res, next) => {
   try {
     // 1. Extract token from header
-    const token = req.header("Authorization")?.replace("Bearer ", "");
+    const token = req.header("Authorization")?.replace(/^Bearer\s+/i, "") || req.cookies?.token;
 
     if (!token) {
       return res.status(401).json({
@@ -17,7 +16,7 @@ const authMiddleware = async (req, res, next) => {
     }
 
     // 2. Verify token
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, getJwtSecret());
 
     // 3. Determine if it's a User or an Admin (Checks decoded.id or decoded._id)
     const targetId = decoded.id || decoded._id || decoded.userId;

@@ -2,11 +2,11 @@ const express = require("express");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const morgan = require("morgan");
-const path = require("path");
+const helmet = require("helmet");
 const { apiLimiter } = require("./middleware/rateLimiter");
+const errorHandler = require("./middleware/error.middleware");
 
 const authRoutes = require("./routes/auth.routes");
-const connectDB = require("./config/db");
 const companyRoutes = require("./routes/companyRoutes");
 
 // Admin Routes
@@ -25,9 +25,6 @@ const userAppointmentRoutes = require("./routes/user/appointment.routes");
 const userDashboardRoutes = require("./routes/user/dashboard.routes");
 const userLoadBoardRoutes = require("./routes/user/loadboard.routes");
 
-// Legacy Routes
-const legacyInvoiceRoutes = require("./routes/invoice.routes");
-const legacyAppointmentRoutes = require("./routes/appointment.routes");
 
 const app = express();
 
@@ -35,10 +32,7 @@ const app = express();
 // Changed 'true' to 1 (1 proxy hop = Nginx). Solves express-rate-limit trustProxy error.
 app.set("trust proxy", 1);
 
-// 2. DATABASE CONNECTION
-connectDB();
-
-// 3. CORE CORS MIDDLEWARE
+// 2. CORE CORS MIDDLEWARE
 const allowedOrigins = process.env.FRONTEND_URL 
   ? process.env.FRONTEND_URL.split(',').map(url => url.trim()).filter(url => url)
   : ["http://localhost:3000"];
@@ -62,8 +56,8 @@ app.use(cors({
   allowedHeaders: ["Content-Type", "Authorization"],
 }));
 
-// 4. PARSING MIDDLEWARES & ERROR HANDLING
-app.use(express.json());
+app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
+app.use(express.json({ limit: "1mb" }));
 
 // Catch bad JSON bodies without throwing server errors
 app.use((err, req, res, next) => {
@@ -76,16 +70,13 @@ app.use((err, req, res, next) => {
 app.use(cookieParser());
 app.use(morgan("dev"));
 
-// 5. ROOT / HEALTH CHECK ROUTE (Fixes 404 on base domain GET requests)
+// 3. ROOT / HEALTH CHECK ROUTE
 app.get("/", (req, res) => {
   res.status(200).json({ success: true, message: "Dispatch Backend API running successfully" });
 });
 
 // Apply general API rate limiting
 app.use("/api", apiLimiter);
-
-// 6. STATIC FILE SERVING FOR UPLOADS
-app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // 7. APPLICATION API ROUTES
 
@@ -106,11 +97,14 @@ app.use("/api/user/appointments", userAppointmentRoutes);
 app.use("/api/user/dashboard", userDashboardRoutes);
 app.use("/api/user/loadboard", userLoadBoardRoutes);
 
+// Backward-compatible aliases. They use the same authenticated, ownership-
+// checked user routers rather than the retired legacy controllers.
+app.use("/api/invoices", userInvoiceRoutes);
+app.use("/api/appointments", userAppointmentRoutes);
+
 // Public Routes
 app.use("/api", publicRoutes);
 
-// Legacy Routes
-app.use("/api/invoices", legacyInvoiceRoutes);
-app.use("/api/appointments", legacyAppointmentRoutes);
+app.use(errorHandler);
 
 module.exports = app;

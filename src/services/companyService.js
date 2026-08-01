@@ -1,37 +1,33 @@
 const CompanyProfile = require("../models/CompanyProfile.js");
 
 const getCompanyProfileService = async (userId = null, isAdmin = false) => {
-  // Return all company profiles to all authenticated users
-  // Company profiles are system-wide and should be visible to everyone
-  return await CompanyProfile.find({});
+  // Profiles are shared reference data used by the invoice payee/customer
+  // selectors. Authorization is enforced for writes and deletes below.
+  return CompanyProfile.find({});
 };
 
-const saveOrUpdateProfileService = async (profileData, userId = null) => {
+const saveOrUpdateProfileService = async (profileData, userId = null, isAdmin = false) => {
+  const { _id, userId: suppliedUserId, ...safeProfileData } = profileData;
   if (profileData._id) {
-    return await CompanyProfile.findByIdAndUpdate(
-      profileData._id,
-      { $set: profileData },
+    return CompanyProfile.findOneAndUpdate(
+      isAdmin ? { _id } : { _id, userId },
+      { $set: safeProfileData },
       { returnDocument: "after", runValidators: true }
     );
   }
 
-  // Add userId if provided
-  if (userId && !profileData.userId) {
-    profileData.userId = userId;
-  }
-
-  return await CompanyProfile.create(profileData);
+  return CompanyProfile.create({ ...safeProfileData, userId: isAdmin ? suppliedUserId || userId : userId });
 };
 
-const deleteProfileService = async (id, isAdmin = false) => {
+const deleteProfileService = async (id, userId = null, isAdmin = false) => {
   if (id) {
-    return await CompanyProfile.findByIdAndDelete(id);
+    return CompanyProfile.findOneAndDelete(isAdmin ? { _id: id } : { _id: id, userId });
   }
   // Only allow delete many for admin
   if (isAdmin) {
     return await CompanyProfile.deleteMany({});
   }
-  return { message: "Unauthorized" };
+  return null;
 };
 
 module.exports = {

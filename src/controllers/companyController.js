@@ -20,6 +20,7 @@ const getProfile = async (req, res) => {
     }
     
     const profiles = await getCompanyProfileService(userId, isAdmin);
+    res.set("Cache-Control", "no-store");
     return res.status(200).json({ success: true, data: profiles });
   } catch (error) {
     console.error("Error in getProfile:", error);
@@ -43,7 +44,11 @@ const saveProfile = async (req, res) => {
       });
     }
     
-    const updatedProfile = await saveOrUpdateProfileService(data, userId);
+    const updatedProfile = await saveOrUpdateProfileService(data, userId, isAdmin);
+
+    if (!updatedProfile) {
+      return res.status(404).json({ success: false, error: "Company profile not found." });
+    }
 
     return res.status(200).json({ success: true, data: updatedProfile });
   } catch (error) {
@@ -56,7 +61,10 @@ const clearProfile = async (req, res) => {
   try {
     const { id } = req.query; 
     const isAdmin = req.accountType === "admin";
-    await deleteProfileService(id, isAdmin);
+    const deletedProfile = await deleteProfileService(id, req.user?._id, isAdmin);
+    if (!deletedProfile && id) {
+      return res.status(404).json({ success: false, error: "Company profile not found." });
+    }
     return res.status(200).json({ success: true, message: "Profile cleared successfully" });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });

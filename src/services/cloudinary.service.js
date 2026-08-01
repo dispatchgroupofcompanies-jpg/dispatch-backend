@@ -5,9 +5,9 @@ const os = require("os");
 
 // Configure Cloudinary
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "wsretejw",
-  api_key: process.env.CLOUDINARY_API_KEY || "423782697854753",
-  api_secret: process.env.CLOUDINARY_API_SECRET || "nCugz4mXowqeXtmbU3Om0aEramk",
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
 /**

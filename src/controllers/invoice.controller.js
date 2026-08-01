@@ -3,6 +3,27 @@ const generateInvoiceNumber = require("../services/invoiceNumber.service");
 const calculateInvoice = require("../services/invoiceCalculation.service");
 const generateInvoicePDF = require("../services/pdf.service");
 
+const createInvoiceWithUniqueNumber = async (payload, maxRetries = 3) => {
+  let attempt = 0;
+
+  while (true) {
+    try {
+      return await Invoice.create(payload);
+    } catch (err) {
+      const isDuplicateInvoiceNumber = err.code === 11000 && err.keyPattern?.invoiceNumber;
+      if (isDuplicateInvoiceNumber && attempt < maxRetries) {
+        attempt += 1;
+        const newNumber = await generateInvoiceNumber(payload.payee);
+        payload.invoiceNumber = newNumber.invoiceNumber;
+        payload.payeeKey = newNumber.payeeKey;
+        payload.payeeSerialNumber = newNumber.serialNumber;
+        continue;
+      }
+      throw err;
+    }
+  }
+};
+
 // 1. CREATE INVOICE
 const createInvoice = async (req, res) => {
   try {
@@ -29,7 +50,7 @@ const createInvoice = async (req, res) => {
       institutionNumber: data.institutionNumber || "N/A"
     } : null);
 
-    const invoice = await Invoice.create({
+    const invoice = await createInvoiceWithUniqueNumber({
       ...data,
       customer: customerData,
       invoiceNumber: generatedNumber.invoiceNumber,

@@ -4,9 +4,10 @@ const router = express.Router();
 const { createUser, getUsers, updateUser, deleteUser } = require("../../controllers/userController.js");
 
 const authenticate = require("../../middleware/auth.middleware");
+const { requireAdmin } = require("../../middleware/authorize.middleware");
 
 // All admin user management routes require authentication
-router.use(authenticate);
+router.use(authenticate, requireAdmin);
 
 // Create new user
 router.post("/", createUser);

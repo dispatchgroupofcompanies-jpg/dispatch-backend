@@ -28,9 +28,129 @@ const getPayeeQuery = (invoice) => {
   return { payeeKey, payeeQueries };
 };
 
-// Used while rendering legacy invoices too. This deliberately derives the
-// sequence from creation order so old global numbers never leak into a PDF or
-// email while the migration is being rolled out.
+const getHighestNumericFieldValue = async (matchFilter, fieldName) => {
+  const result = await Invoice.aggregate([
+    { $match: matchFilter },
+    {
+      $project: {
+        numericValue: {
+          $cond: [
+            {
+              $in: [
+                { $type: `$${fieldName}` },
+                ["int", "long", "double"]
+              ]
+            },
+            `$${fieldName}`,
+            {
+              $toLong: `$${fieldName}`
+            }
+          ]
+        }
+      }
+    },
+    { $sort: { numericValue: -1 } },
+    { $limit: 1 }
+  ]);
+
+  return result?.[0]?.numericValue ?? 0;
+};
+
+const getHighestNumericInvoiceNumber = async () => {
+  return getHighestNumericFieldValue(
+    {
+      $or: [
+        { invoiceNumber: { $type: "int" } },
+        { invoiceNumber: { $type: "long" } },
+        { invoiceNumber: { $type: "double" } },
+        {
+          $and: [
+            { invoiceNumber: { $type: "string" } },
+            { invoiceNumber: { $regex: "^[0-9]+$" } }
+          ]
+        }
+      ]
+    },
+    "invoiceNumber"
+  );
+};
+
+const getHighestNumericPayeeSerialNumber = async (payeeKey) => {
+  return getHighestNumericFieldValue(
+    {
+      payeeKey,
+      $or: [
+        { payeeSerialNumber: { $type: "int" } },
+        { payeeSerialNumber: { $type: "long" } },
+        { payeeSerialNumber: { $type: "double" } },
+        {
+          $and: [
+            { payeeSerialNumber: { $type: "string" } },
+            { payeeSerialNumber: { $regex: "^[0-9]+$" } }
+          ]
+        }
+      ]
+    },
+    "payeeSerialNumber"
+  );
+};
+
+const getNextCounterSequence = async (counterName, seed = 0) => {
+  const pipeline = [
+    {
+      $set: {
+        sequence: {
+          $add: [
+            {
+              $max: [
+                { $ifNull: ["$sequence", seed] },
+                seed
+              ]
+            },
+            1
+          ]
+        }
+      }
+    }
+  ];
+
+  const counter = await Counter.findOneAndUpdate(
+    { name: counterName },
+    pipeline,
+    {
+      upsert: true,
+      returnDocument: "after",
+      updatePipeline: true
+    }
+  );
+
+  return counter.sequence;
+};
+
+const generateInvoiceNumber = async (payee) => {
+  const payeeKey = getPayeeKey(payee);
+  const counterName = `invoice:${payeeKey}`;
+
+  const [highestGlobalInvoice, highestPayeeInvoice] = await Promise.all([
+    getHighestNumericInvoiceNumber(),
+    getHighestNumericPayeeSerialNumber(payeeKey)
+  ]);
+
+  const payeeInvoiceCount = await Invoice.countDocuments({ payeeKey });
+  const payeeSeed = Math.max(highestPayeeInvoice, payeeInvoiceCount);
+
+  const [globalSequence, payeeSequence] = await Promise.all([
+    getNextCounterSequence("invoice", highestGlobalInvoice),
+    getNextCounterSequence(counterName, payeeSeed)
+  ]);
+
+  return {
+    payeeKey,
+    serialNumber: payeeSequence,
+    invoiceNumber: String(globalSequence)
+  };
+};
+
 const getPayeeSerialNumber = async (invoice) => {
   if (!invoice?.createdAt) return invoice?.payeeSerialNumber || 1;
 
@@ -41,68 +161,11 @@ const getPayeeSerialNumber = async (invoice) => {
       {
         $or: [
           { createdAt: { $lt: new Date(invoice.createdAt) } },
-          { createdAt: new Date(invoice.createdAt), _id: { $lte: invoice._id } },
-        ],
-      },
-    ],
+          { createdAt: new Date(invoice.createdAt), _id: { $lte: invoice._id } }
+        ]
+      }
+    ]
   });
-};
-
-const getHighestExistingSequence = async (query, field) => {
-  try {
-    const result = await Invoice.aggregate([
-      { $match: query },
-      { $project: { seq: { $toInt: `$${field}` } } },
-      { $sort: { seq: -1 } },
-      { $limit: 1 },
-    ]);
-
-    if (result.length && Number.isFinite(result[0]?.seq)) {
-      return result[0].seq;
-    }
-  } catch (err) {
-    console.warn(`Unable to determine highest existing ${field}:`, err.message);
-  }
-
-  return Invoice.countDocuments(query);
-};
-
-const getNextCounterSequence = async (counterName, seed = 0) => {
-  const counter = await Counter.findOneAndUpdate(
-    { name: counterName },
-    {
-      $setOnInsert: { sequence: seed },
-      $max: { sequence: seed },
-      $inc: { sequence: 1 },
-    },
-    {
-      returnDocument: "after",
-      upsert: true,
-    }
-  );
-
-  return counter.sequence;
-};
-
-const generateInvoiceNumber = async (payee) => {
-  const payeeKey = getPayeeKey(payee);
-  const counterName = `invoice:${payeeKey}`;
-  const globalCounterName = "invoice";
-  const { payeeQueries } = getPayeeQuery({ payee });
-
-  const highestGlobalInvoice = await getHighestExistingSequence({ invoiceNumber: { $exists: true } }, "invoiceNumber");
-  const highestPayeeInvoice = await getHighestExistingSequence({ $or: payeeQueries }, "payeeSerialNumber");
-
-  const [globalSequence, payeeSequence] = await Promise.all([
-    getNextCounterSequence(globalCounterName, highestGlobalInvoice),
-    getNextCounterSequence(counterName, highestPayeeInvoice),
-  ]);
-
-  return {
-    payeeKey,
-    serialNumber: payeeSequence,
-    invoiceNumber: String(globalSequence),
-  };
 };
 
 module.exports = generateInvoiceNumber;

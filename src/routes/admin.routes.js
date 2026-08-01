@@ -1,5 +1,7 @@
 const express = require("express");
 const router = express.Router();
+const authenticate = require("../middleware/auth.middleware");
+const { requireAdmin } = require("../middleware/authorize.middleware");
 
 const { resetAdminPassword, getAdminProfile } = require("../controllers/admin.controller");
 const {
@@ -11,6 +13,8 @@ const {
   revokeDeviceRequest,
   getDeviceRequestStats,
 } = require("../controllers/admin/deviceRequest.controller");
+
+router.use(authenticate, requireAdmin);
 
 // 🔥 ADMIN PASSWORD RESET ROUTE
 router.post("/reset-password", resetAdminPassword);

@@ -10,9 +10,10 @@ const {
 } = require("../../controllers/admin/appointment.controller.js");
 
 const authenticate = require("../../middleware/auth.middleware.js");
+const { requireAdmin } = require("../../middleware/authorize.middleware");
 
 // All admin appointment routes require authentication
-router.use(authenticate);
+router.use(authenticate, requireAdmin);
 
 // Get all appointments
 router.get("/", getAppointments);

@@ -1,7 +1,5 @@
 const nodemailer = require("nodemailer");
 const axios = require("axios");
-const fs = require("fs");
-const path = require("path");
 const { generateInvoiceEmailHtml } = require("./email-template.service");
 const { getPayeeSerialNumber } = require("./invoiceNumber.service");
 
@@ -77,7 +75,7 @@ const sendInvoiceEmail = async (emailsList, pdfPath, invoiceNumber, customSubjec
     console.log("📧 EMAIL SERVICE STARTED");
     console.log(`📧 To: ${JSON.stringify(emailsList)}`);
     console.log(`📧 Subject: ${customSubject || `Invoice #${payeeSerialNumber}`}`);
-    console.log(`📧 PDF Path: ${pdfPath}`);
+    console.log(`📧 PDF source: ${Buffer.isBuffer(pdfPath) ? "generated buffer" : pdfPath}`);
     console.log(`📧 Has PDF: ${pdfPath ? 'Yes' : 'No'}`);
 
     // Check environment variables based on email service
@@ -137,32 +135,27 @@ const sendInvoiceEmail = async (emailsList, pdfPath, invoiceNumber, customSubjec
       }
     }
 
-    // Build attachments array only if pdfPath is provided
+    // Build the attachment directly from a generated PDF buffer when supplied.
+    // This avoids Cloudinary download/ACL failures and concurrent temp-file races.
     let attachments = [];
     if (pdfPath) {
-      // Check if pdfPath is a Cloudinary URL (starts with http:// or https://)
-      if (pdfPath.startsWith("http://") || pdfPath.startsWith("https://")) {
+      if (Buffer.isBuffer(pdfPath)) {
+        attachments = [{
+          filename: `invoice-${payeeSerialNumber}.pdf`,
+          content: pdfPath,
+          contentType: "application/pdf",
+        }];
+      } else if (pdfPath.startsWith("http://") || pdfPath.startsWith("https://")) {
         console.log("📧 Downloading PDF from Cloudinary...");
         try {
           const response = await axios.get(pdfPath, { responseType: "arraybuffer" });
-          const tempPath = path.join(process.cwd(), "uploads", "temp-email-attachment.pdf");
-          
-          // Ensure temp directory exists
-          const tempDir = path.dirname(tempPath);
-          if (!fs.existsSync(tempDir)) {
-            fs.mkdirSync(tempDir, { recursive: true });
-          }
-          
-          fs.writeFileSync(tempPath, response.data);
-          console.log("✅ PDF downloaded from Cloudinary to temp file");
-          
           attachments = [{
             filename: `invoice-${payeeSerialNumber}.pdf`,
-            path: tempPath,
+            content: Buffer.from(response.data),
+            contentType: "application/pdf",
           }];
         } catch (downloadError) {
-          console.error("❌ Failed to download PDF from Cloudinary:", downloadError.message);
-          // Continue without attachment
+          throw new Error(`Unable to prepare PDF attachment: ${downloadError.message}`);
         }
       } else {
         // Local file path
@@ -197,16 +190,6 @@ const sendInvoiceEmail = async (emailsList, pdfPath, invoiceNumber, customSubjec
     const result = await transporter.sendMail(mailOptions);
     console.log("✅ Email sent successfully!");
     console.log(`📧 Message ID: ${result.messageId}`);
-
-    // Clean up temp file if it was created
-    if (attachments.length > 0 && attachments[0].path.includes("temp-email-attachment.pdf")) {
-      try {
-        fs.unlinkSync(attachments[0].path);
-        console.log("🗑️ Temp attachment file cleaned up");
-      } catch (cleanupError) {
-        console.warn("⚠️ Could not clean up temp file:", cleanupError.message);
-      }
-    }
 
     return result;
   } catch (error) {
