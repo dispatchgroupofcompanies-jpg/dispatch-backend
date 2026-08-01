@@ -35,7 +35,7 @@ const migrateInvoiceNumbers = async () => {
     const counter = await Counter.findOneAndUpdate(
       { name: 'invoice' },
       { $set: { sequence: highestNumber } },
-      { new: true, upsert: true }
+      { returnDocument: 'after', upsert: true }
     );
     console.log(`\nCounter updated to sequence: ${counter.sequence}`);
 

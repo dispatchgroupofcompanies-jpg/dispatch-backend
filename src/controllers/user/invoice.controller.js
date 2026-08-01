@@ -3,6 +3,28 @@ const axios = require("axios");
 const generateInvoicePDF = require("../../services/pdf.service");
 const { generateInvoicePdfBuffer } = generateInvoicePDF;
 
+const createInvoiceWithUniqueNumber = async (payload, maxRetries = 3) => {
+  let attempt = 0;
+
+  while (true) {
+    try {
+      return await Invoice.create(payload);
+    } catch (err) {
+      const isDuplicateInvoiceNumber = err.code === 11000 && err.keyPattern?.invoiceNumber;
+      if (isDuplicateInvoiceNumber && attempt < maxRetries) {
+        attempt += 1;
+        const generateInvoiceNumber = require("../../services/invoiceNumber.service");
+        const newNumber = await generateInvoiceNumber(payload.payee);
+        payload.invoiceNumber = newNumber.invoiceNumber;
+        payload.payeeKey = newNumber.payeeKey;
+        payload.payeeSerialNumber = newNumber.serialNumber;
+        continue;
+      }
+      throw err;
+    }
+  }
+};
+
 // User: Create new invoice
 exports.createInvoice = async (req, res) => {
   try {
@@ -58,7 +80,7 @@ exports.createInvoice = async (req, res) => {
       };
     }
 
-    const invoice = await Invoice.create(invoicePayload);
+    const invoice = await createInvoiceWithUniqueNumber(invoicePayload);
 
     try {
       invoice.pdfUrl = await generateInvoicePDF(invoice);

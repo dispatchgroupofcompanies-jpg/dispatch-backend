@@ -287,7 +287,7 @@ const updateAppointment = async (req, res) => {
     const updatedAppointment = await Appointment.findByIdAndUpdate(
       req.params.id,
       req.body,
-      { new: true, runValidators: true }
+      { returnDocument: "after", runValidators: true }
     );
     
     return res.json({ success: true, message: "Appointment updated successfully!", data: updatedAppointment });

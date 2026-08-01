@@ -48,40 +48,60 @@ const getPayeeSerialNumber = async (invoice) => {
   });
 };
 
-const generateInvoiceNumber = async (payee) => {
-  const payeeKey = getPayeeKey(payee);
-  const counterName = `invoice:${payeeKey}`;
+const getHighestExistingSequence = async (query, field) => {
+  try {
+    const result = await Invoice.aggregate([
+      { $match: query },
+      { $project: { seq: { $toInt: `$${field}` } } },
+      { $sort: { seq: -1 } },
+      { $limit: 1 },
+    ]);
 
-  // The count makes deployment safe for existing, pre-migration invoices.
-  // New counters are still incremented atomically by MongoDB.
-  const { payeeQueries } = getPayeeQuery({ payee });
-  const existingInvoices = await Invoice.countDocuments({ $or: payeeQueries });
+    if (result.length && Number.isFinite(result[0]?.seq)) {
+      return result[0].seq;
+    }
+  } catch (err) {
+    console.warn(`Unable to determine highest existing ${field}:`, err.message);
+  }
 
-  await Counter.findOneAndUpdate(
-    { name: counterName },
-    { $setOnInsert: { sequence: existingInvoices } },
-    { new: true, upsert: true },
-  );
+  return Invoice.countDocuments(query);
+};
 
+const getNextCounterSequence = async (counterName, seed = 0) => {
   const counter = await Counter.findOneAndUpdate(
+    { name: counterName },
     {
-      name: counterName,
+      $setOnInsert: { sequence: seed },
+      $max: { sequence: seed },
+      $inc: { sequence: 1 },
     },
     {
-      $inc: {
-        sequence: 1,
-      },
-    },
-    {
-      new: true,
+      returnDocument: "after",
       upsert: true,
     }
   );
 
+  return counter.sequence;
+};
+
+const generateInvoiceNumber = async (payee) => {
+  const payeeKey = getPayeeKey(payee);
+  const counterName = `invoice:${payeeKey}`;
+  const globalCounterName = "invoice";
+  const { payeeQueries } = getPayeeQuery({ payee });
+
+  const highestGlobalInvoice = await getHighestExistingSequence({ invoiceNumber: { $exists: true } }, "invoiceNumber");
+  const highestPayeeInvoice = await getHighestExistingSequence({ $or: payeeQueries }, "payeeSerialNumber");
+
+  const [globalSequence, payeeSequence] = await Promise.all([
+    getNextCounterSequence(globalCounterName, highestGlobalInvoice),
+    getNextCounterSequence(counterName, highestPayeeInvoice),
+  ]);
+
   return {
     payeeKey,
-    serialNumber: counter.sequence,
-    invoiceNumber: String(counter.sequence),
+    serialNumber: payeeSequence,
+    invoiceNumber: String(globalSequence),
   };
 };
 

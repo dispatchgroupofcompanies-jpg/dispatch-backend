@@ -11,7 +11,7 @@ const saveOrUpdateProfileService = async (profileData, userId = null) => {
     return await CompanyProfile.findByIdAndUpdate(
       profileData._id,
       { $set: profileData },
-      { new: true, runValidators: true }
+      { returnDocument: "after", runValidators: true }
     );
   }
 

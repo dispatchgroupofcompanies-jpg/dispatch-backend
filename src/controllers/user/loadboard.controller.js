@@ -190,7 +190,7 @@ exports.updateLoadBoardRecord = async (req, res) => {
     const record = await LoadBoard.findOneAndUpdate(
       { _id: id, createdBy: userId },
       updateData,
-      { new: true, runValidators: true }
+      { returnDocument: "after", runValidators: true }
     ).lean();
 
     if (!record) {
