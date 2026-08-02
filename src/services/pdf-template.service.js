@@ -249,7 +249,7 @@ const generateInvoicePdfHtml = (invoice) => {
           <table class="details-table" style="table-layout: fixed;">
             <tr>
               <td style="vertical-align: top; width: 50%; padding-right: 20px;">
-                <div style="font-size: 11px; text-transform: uppercase; color: #64748b; margin: 0 0 6px 0; font-weight: bold; letter-spacing: 0.5px;">EXTREME LOGISTICS INVOICE FROM:</div>
+                <div style="font-size: 11px; text-transform: uppercase; color: #64748b; margin: 0 0 6px 0; font-weight: bold; letter-spacing: 0.5px;">XCDGOC PVT LTD:</div>
                 <div>
                   <span class="company-name-red">${invoice.payee?.companyName || invoice.payee?.customerName || "N/A"}</span>
                   <div style="color: #475569; font-size: 12px; line-height: 1.3; text-transform: uppercase;">
@@ -335,7 +335,7 @@ const generateInvoicePdfHtml = (invoice) => {
                 <td style="width: 55%; vertical-align: top;">
                   <h2 class="footer-brand">XCDGOC PVT LTD</h2>
                   <div class="footer-left-copy">
-                    Extreme Canada Dispatch Group of Companies<br/>
+                    XCDGOC PVT LTD<br/>
                     <span style="font-size: 11px; font-weight: 800; color: #0f2962; letter-spacing: 0.2px;">WE ARE CANADA'S LEADING AND LARGEST DISPATCH SERVICES PROVIDEERS</span>
                   </div>
                 </td>

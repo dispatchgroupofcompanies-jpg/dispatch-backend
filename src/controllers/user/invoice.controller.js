@@ -116,7 +116,7 @@ exports.createInvoice = async (req, res) => {
   }
 };
 
-// User: Get own invoices only
+// User: Get own invoices only (supports optional status filter and pagination)
 exports.getInvoiceList = async (req, res) => {
   try {
     const userId = req.user?._id;
@@ -131,6 +131,17 @@ exports.getInvoiceList = async (req, res) => {
 
     // Only get invoices created by this user
     const filter = { createdBy: userId };
+
+    // Optional status filter (supports comma-separated list)
+    if (req.query.status) {
+      const statuses = String(req.query.status)
+        .split(',')
+        .map(s => s.trim().toLowerCase())
+        .filter(Boolean);
+      if (statuses.length) {
+        filter.invoiceStatus = { $in: statuses };
+      }
+    }
     
     const totalInvoices = await Invoice.countDocuments(filter);
     const invoices = await Invoice.find(filter)
@@ -140,9 +151,10 @@ exports.getInvoiceList = async (req, res) => {
 
     return res.json({
       success: true,
-      total: invoices.length,
+      total: totalInvoices,
       totalPages: Math.ceil(totalInvoices / limit),
       currentPage: page,
+      perPage: limit,
       data: invoices,
     });
   } catch (error) {

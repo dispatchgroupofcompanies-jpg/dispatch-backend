@@ -86,7 +86,7 @@ const generateInvoiceEmailHtml = (invoice) => {
               <tr>
                 <td style="padding-bottom: 15px; border-bottom: 3px solid #102a63;">
                   <h1 style="margin: 0 0 5px 0; font-size: 22px; font-weight: 900; color: #0f2962; text-transform: uppercase;">XCDGOC PVT LTD</h1>
-                  <p style="margin: 0; font-size: 11px; color: #64748b; font-weight: 600;">Extreme Canada Dispatch Group of Companies</p>
+                  <p style="margin: 0; font-size: 11px; color: #64748b; font-weight: 600;">XCDGOC PVT LTD</p>
                   <p style="margin: 4px 0 0 0; font-size: 10px; color: #64748b;">Canada's Leading Dispatch Services Provider</p>
                 </td>
               </tr>
@@ -99,7 +99,7 @@ const generateInvoiceEmailHtml = (invoice) => {
                   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                     <tr>
                       <td style="width: 50%; vertical-align: top; padding-right: 20px;">
-                        <div style="font-size: 11px; text-transform: uppercase; color: #64748b; margin: 0 0 6px 0; font-weight: bold; letter-spacing: 0.5px;">EXTREME LOGISTICS INVOICE FROM:</div>
+                        <div style="font-size: 11px; text-transform: uppercase; color: #64748b; margin: 0 0 6px 0; font-weight: bold; letter-spacing: 0.5px;">XCDGOC PVT LTD:</div>
                         <div>
                           <span style="font-size: 14px; font-weight: bold; color: #dc2626; display: block; margin-bottom: 2px; text-transform: uppercase;">${invoice.payee?.companyName || invoice.payee?.customerName || "N/A"}</span>
                           <div style="color: #475569; font-size: 12px; line-height: 1.3; text-transform: uppercase;">
@@ -212,7 +212,7 @@ const generateInvoiceEmailHtml = (invoice) => {
               <tr>
                 <td style="width: 55%; vertical-align: top;">
                   <h2 style="margin: 0 0 4px 0; font-size: 22px; font-weight: 900; color: #475569; letter-spacing: 1px;">XCDGOC PVT LTD</h2>
-                  <p style="margin: 0; font-size: 12px; font-weight: bold; color: #475569; line-height: 1.3;">Extreme Canada Dispatch Group of Companies</p>
+                  <p style="margin: 0; font-size: 12px; font-weight: bold; color: #475569; line-height: 1.3;">XCDGOC PVT LTD</p>
                   <p style="margin: 4px 0 0 0; font-size: 10px; font-weight: bold; color: #0f2962;">WE ARE CANADA'S LEADING AND LARGEST DISPATCH SERVICES PROVIDEERS</p>
                 </td>
                 <td style="width: 45%; vertical-align: top; text-align: right;">

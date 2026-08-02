@@ -9,7 +9,7 @@ const { getPagination } = require("../../middleware/validation.middleware");
 // Admin: Get all invoices with pagination and filters (with user-based access control)
 exports.getAllInvoices = async (req, res) => {
   try {
-    const { page, limit, skip } = getPagination(req.query);
+    const { page, limit, skip } = getPagination(req.query, { defaultLimit: 24 });
 
     const filter = {};
     

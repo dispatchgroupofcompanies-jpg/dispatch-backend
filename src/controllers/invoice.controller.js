@@ -111,17 +111,56 @@ const createInvoice = async (req, res) => {
   }
 };
 
-// 2. GET ALL INVOICES
+// 2. GET ALL INVOICES (supports optional status filter, pagination, and sorting)
 const getInvoiceList = async (req, res) => {
   try {
-    const query = req.accountType === "admin" ? {} : { createdBy: req.user?._id };
-    
-    if (!req.accountType !== "admin" && !req.user?._id) {
+    const isAdmin = req.accountType === "admin";
+
+    // Basic auth check: non-admins must be authenticated users
+    if (!isAdmin && !req.user?._id) {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
 
-    const invoices = await Invoice.find(query).sort({ createdAt: -1 });
-    return res.json({ success: true, total: invoices.length, data: invoices });
+    // Query params: page, limit, status (comma-separated), sortBy, order
+    const {
+      page = 1,
+      limit = 20,
+      status,
+      sortBy = "createdAt",
+      order = "desc",
+    } = req.query;
+
+    const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+    const perPage = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 200);
+
+    const query = isAdmin ? {} : { createdBy: req.user._id };
+
+    // Allow filtering by one or more statuses, e.g. ?status=approved,draft
+    if (status) {
+      const statuses = String(status)
+        .split(",")
+        .map(s => s.trim().toLowerCase())
+        .filter(Boolean);
+      if (statuses.length) {
+        query.invoiceStatus = { $in: statuses };
+      }
+    }
+
+    const sortOrder = order === "asc" ? 1 : -1;
+
+    const total = await Invoice.countDocuments(query);
+    const invoices = await Invoice.find(query)
+      .sort({ [sortBy]: sortOrder })
+      .skip((pageNum - 1) * perPage)
+      .limit(perPage);
+
+    return res.json({
+      success: true,
+      total,
+      page: pageNum,
+      perPage,
+      data: invoices,
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
