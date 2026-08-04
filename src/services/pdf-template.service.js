@@ -24,11 +24,16 @@ const maskGstNumber = (gstNumber) => {
 };
 
 const generateInvoicePdfHtml = (invoice) => {
-  const tripsCount = invoice.trips?.length || 0;
   const serialNumber = invoice.payeeSerialNumber ?? invoice.invoiceNumber ?? "N/A";
   const dynamicInvoiceTitle = `INVOICE - #${serialNumber}`;
   const eTransferAddress =
     invoice.customer?.eTransfer || invoice.payee?.eTransferAddress;
+
+  // Calculate total dispatch charges matching the email template logic
+  const dispatchTotal =
+    invoice.dispatchTotal ||
+    invoice.trips?.reduce((acc, t) => acc + (t.dispatchAmount || 0), 0) ||
+    0;
 
   const tripRows = (invoice.trips || [])
     .map((trip) => {
@@ -79,8 +84,6 @@ const generateInvoicePdfHtml = (invoice) => {
             overflow: hidden;
           }
 
-          /* These rules apply only to browser previews; the downloaded PDF
-             retains the A4 print layout above. */
           @media screen and (max-width: 700px) {
             body {
               width: 100%;
@@ -105,7 +108,6 @@ const generateInvoicePdfHtml = (invoice) => {
             .footer-band { position: static; height: auto; margin-top: 24px; padding: 18px 16px; }
           }
 
-          /* Diagonal Watermark Styling */
           .watermark {
             position: absolute;
             top: 50%;
@@ -147,13 +149,6 @@ const generateInvoicePdfHtml = (invoice) => {
             margin: 0;
             line-height: 1.1;
             text-transform: uppercase;
-          }
-
-          .invoice-number {
-            font-size: 13px;
-            color: #5f6978;
-            margin-top: 4px;
-            display: block;
           }
 
           .details-table {
@@ -236,7 +231,6 @@ const generateInvoicePdfHtml = (invoice) => {
         </style>
       </head>
       <body>
-        <!-- Watermark base layer behind content -->
         <div class="watermark">XCDGOC PVT LTD</div>
 
         <div class="page-container">
@@ -249,7 +243,7 @@ const generateInvoicePdfHtml = (invoice) => {
           <table class="details-table" style="table-layout: fixed;">
             <tr>
               <td style="vertical-align: top; width: 50%; padding-right: 20px;">
-                <div style="font-size: 11px; text-transform: uppercase; color: #64748b; margin: 0 0 6px 0; font-weight: bold; letter-spacing: 0.5px;">XCDGOC PVT LTD:</div>
+                <div style="font-size: 11px; text-transform: uppercase; color: #64748b; margin: 0 0 6px 0; font-weight: bold; letter-spacing: 0.5px;">Payee</div>
                 <div>
                   <span class="company-name-red">${invoice.payee?.companyName || invoice.payee?.customerName || "N/A"}</span>
                   <div style="color: #475569; font-size: 12px; line-height: 1.3; text-transform: uppercase;">
@@ -263,7 +257,7 @@ const generateInvoicePdfHtml = (invoice) => {
                 </div>
               </td>
               <td style="vertical-align: top; width: 50%; padding-left: 40px;">
-                <div style="font-size: 11px; text-transform: uppercase; color: #64748b; margin: 0 0 6px 0; font-weight: bold; letter-spacing: 0.5px;">INVOICE TO:</div>
+                <div style="font-size: 11px; text-transform: uppercase; color: #64748b; margin: 0 0 6px 0; font-weight: bold; letter-spacing: 0.5px;">Pay TO:</div>
                 <div>
                   <span class="company-name-blue">${invoice.customer?.companyName || invoice.customer?.customerName || "N/A"}</span>
                   <div style="color: #475569; font-size: 12px; line-height: 1.3; text-transform: uppercase;">
@@ -287,7 +281,7 @@ const generateInvoicePdfHtml = (invoice) => {
                 <th style="width: 20%;">TRIP ID</th>
                 <th style="width: 20%;">ASSIGNED</th>
                 <th style="width: 15%;">ROUTE</th>
-                <th style="width: 18%;">DISCRIPTION</th>
+                <th style="width: 18%;">DESCRIPTION</th>
                 <th style="width: 12%; text-align: right;">CHARGES</th>
               </tr>
             </thead>
@@ -296,29 +290,33 @@ const generateInvoicePdfHtml = (invoice) => {
             </tbody>
           </table>
 
-          <!-- Grand Total & Deposit Details Below Table -->
+          <!-- Grand Total, Dispatch Charges & Deposit Details -->
           <table style="width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 15px;">
             <tr>
               <td style="width: 50%;"></td>
               <td style="width: 50%; vertical-align: top;">
-                <table style="width: 100%; border-collapse: collapse; background-color: #f8fafc; border-top: 3px solid #102a63; border-bottom: 3px solid #102a63; padding: 10px;">
+                <table style="width: 100%; border-collapse: collapse; background-color: #f8fafc; border-top: 3px solid #102a63; border-bottom: 3px solid #102a63;">
                   <tr style="border-bottom: 1px solid #e2e8f0;">
-                    <td style="padding: 6px 8px; font-size: 11px; font-weight: bold; color: #dc2626; text-transform: uppercase; letter-spacing: 0.5px;">GRAND TOTAL</td>
-                    <td style="padding: 6px 8px; font-size: 14px; font-weight: bold; text-align: right; color: #1e293b; white-space: nowrap;">${formatCurrency(invoice.grandTotal)}</td>
+                    <td style="padding: 8px 10px; font-size: 11px; font-weight: bold; color: #dc2626; text-transform: uppercase; letter-spacing: 0.5px;">DISPATCH CHARGES</td>
+                    <td style="padding: 8px 10px; font-size: 13px; font-weight: bold; text-align: right; color: #dc2626; white-space: nowrap;">${formatCurrency(dispatchTotal)}</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding: 8px 10px; font-size: 11px; font-weight: bold; color: #dc2626; text-transform: uppercase; letter-spacing: 0.5px;">GRAND TOTAL</td>
+                    <td style="padding: 8px 10px; font-size: 15px; font-weight: bold; text-align: right; color: #0f2962; white-space: nowrap;">${formatCurrency(invoice.grandTotal)}</td>
                   </tr>
                   <tr>
-                    <td colspan="2" style="padding: 8px 8px 4px 8px; font-size: 11px; font-weight: bold; color: #dc2626; text-transform: uppercase; letter-spacing: 0.5px;">DEPOSIT DETAILS</td>
+                    <td colspan="2" style="padding: 10px 10px 4px 10px; font-size: 11px; font-weight: bold; color: #dc2626; text-transform: uppercase; letter-spacing: 0.5px;">DEPOSIT DETAILS</td>
                   </tr>
                   ${eTransferAddress ? `
                   <tr>
-                    <td colspan="2" style="padding: 2px 8px 6px 18px; font-size: 11px; color: #dc2626; line-height: 1.5;">
+                    <td colspan="2" style="padding: 2px 10px 6px 18px; font-size: 11px; color: #dc2626; line-height: 1.5;">
                       <span style="font-weight: bold; text-transform: uppercase;">E-TRANSFER:</span> <span style="color: #475569; font-weight: bold;">${eTransferAddress}</span>
                     </td>
                   </tr>
                   ` : ""}
                   ${invoice.accountNumber ? `
                   <tr>
-                    <td colspan="2" style="padding: 2px 8px 6px 18px; font-size: 11px; color: #dc2626; line-height: 1.5;">
+                    <td colspan="2" style="padding: 2px 10px 8px 18px; font-size: 11px; color: #dc2626; line-height: 1.5;">
                       <span style="font-weight: bold; text-transform: uppercase;">VOID CHEQUE:</span> <span style="color: #475569; font-weight: normal; font-size: 10px; text-transform: uppercase;">Institution: ${invoice.institutionNumber || "003"} | Transit: ${invoice.transitNumber || "115000"} | Acct: ${invoice.accountNumber}</span>
                     </td>
                   </tr>
@@ -336,12 +334,12 @@ const generateInvoicePdfHtml = (invoice) => {
                   <h2 class="footer-brand">XCDGOC PVT LTD</h2>
                   <div class="footer-left-copy">
                     XCDGOC PVT LTD<br/>
-                    <span style="font-size: 11px; font-weight: 800; color: #0f2962; letter-spacing: 0.2px;">WE ARE CANADA'S LEADING AND LARGEST DISPATCH SERVICES PROVIDEERS</span>
+                    <span style="font-size: 11px; font-weight: 800; color: #0f2962; letter-spacing: 0.2px;">WE ARE CANADA'S LEADING AND LARGEST DISPATCH SERVICES PROVIDERS</span>
                   </div>
                 </td>
                 <td style="width: 45%; vertical-align: top;">
                   <div class="footer-right-copy">
-                    Open Board,Bision,Walmart,Load Link<br/>
+                    Open Board, Bison, Walmart, Load Link<br/>
                     and Non Amazon Dispatch Solutions<br/><br/>
                     <b>Contact :</b> xcdgoc@gmail.com<br/>
                     +91 750 121 6555<br/>

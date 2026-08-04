@@ -5,6 +5,8 @@ const sendInvoiceEmail = require("../../services/email.service");
 const generateInvoicePDF = require("../../services/pdf.service");
 const { generateInvoicePdfBuffer } = generateInvoicePDF;
 const { getPagination } = require("../../middleware/validation.middleware");
+const { uploadImageBufferToCloudinary, cloudinary } = require("../../services/cloudinary.service");
+
 
 // Admin: Get all invoices with pagination and filters (with user-based access control)
 exports.getAllInvoices = async (req, res) => {
@@ -250,8 +252,94 @@ exports.rejectInvoice = async (req, res) => {
   }
 };
 
+// Admin: Update payment status (pending/paid). Marking as "paid" requires a
+// payment proof image which is uploaded to Cloudinary.
+exports.updatePaymentStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const status = String(req.body.status || "").toLowerCase();
+
+    if (!["pending", "paid"].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid payment status. Allowed values are 'pending' or 'paid'.",
+      });
+    }
+
+    const invoice = await Invoice.findById(id);
+    if (!invoice) {
+      return res.status(404).json({
+        success: false,
+        message: "Invoice not found",
+      });
+    }
+
+    if (status === "paid") {
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: "Payment proof image is required to mark the invoice as paid.",
+        });
+      }
+
+      const upload = await uploadImageBufferToCloudinary(
+        req.file.buffer,
+        req.file.originalname,
+        "payment-proofs"
+      );
+
+      // Remove any previously uploaded proof so Cloudinary stays clean.
+      if (invoice.paymentProofPublicId) {
+        try {
+          await cloudinary.uploader.destroy(invoice.paymentProofPublicId, {
+            resource_type: "image",
+          });
+        } catch (cleanupError) {
+          console.warn("⚠️ Could not delete old payment proof:", cleanupError.message);
+        }
+      }
+
+      invoice.paymentStatus = "paid";
+      invoice.paymentProofUrl = upload.secureUrl;
+      invoice.paymentProofPublicId = upload.publicId;
+      invoice.paidAt = new Date();
+    } else {
+      // Switching back to pending removes the stored proof.
+      if (invoice.paymentProofPublicId) {
+        try {
+          await cloudinary.uploader.destroy(invoice.paymentProofPublicId, {
+            resource_type: "image",
+          });
+        } catch (cleanupError) {
+          console.warn("⚠️ Could not delete payment proof:", cleanupError.message);
+        }
+      }
+
+      invoice.paymentStatus = "pending";
+      invoice.paymentProofUrl = undefined;
+      invoice.paymentProofPublicId = undefined;
+      invoice.paidAt = undefined;
+    }
+
+    await invoice.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Payment status updated to ${status} successfully!`,
+      data: invoice,
+    });
+  } catch (error) {
+    console.error("Error updating payment status:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error while updating payment status",
+    });
+  }
+};
+
 // Admin: Download invoice PDF (no ownership check - admins can download any invoice)
 exports.downloadInvoicePDF = async (req, res) => {
+
   try {
     const invoice = await Invoice.findById(req.params.id);
     if (!invoice) {

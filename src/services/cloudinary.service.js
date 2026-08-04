@@ -54,6 +54,25 @@ const uploadPDFBufferToCloudinary = async (pdfBuffer, fileName, folder = "invoic
   }
 };
 
+/** Upload an image buffer and return both its URL and Cloudinary public ID. */
+const uploadImageBufferToCloudinary = async (imageBuffer, fileName, folder = "load-screenshots") => {
+  const result = await new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        resource_type: "image",
+        folder: `dispatch/${folder}`,
+        public_id: path.parse(fileName).name,
+        overwrite: false,
+        access_mode: "public",
+      },
+      (error, uploadResult) => (error ? reject(error) : resolve(uploadResult))
+    );
+    uploadStream.end(imageBuffer);
+  });
+
+  return { secureUrl: result.secure_url, publicId: result.public_id };
+};
+
 /**
  * Legacy function for backward compatibility
  * Upload PDF to Cloudinary and delete local file
@@ -115,5 +134,6 @@ module.exports = {
   uploadPDFBufferToCloudinary,
   uploadPDFToCloudinary,
   deletePDFFromCloudinary,
+  uploadImageBufferToCloudinary,
   cloudinary,
 };

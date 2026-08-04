@@ -1,4 +1,23 @@
 const LoadBoard = require("../../models/loadboard.model");
+const { uploadImageBufferToCloudinary, cloudinary } = require("../../services/cloudinary.service");
+
+const parseRecordBody = (body) => {
+  const parsed = { ...body };
+  ["mgCharges", "tripCharges", "dispatchCharges", "legs"].forEach((field) => {
+    if (parsed[field] !== undefined && parsed[field] !== "") parsed[field] = Number(parsed[field]);
+  });
+  if (typeof parsed.loads === "string") parsed.loads = JSON.parse(parsed.loads);
+  return parsed;
+};
+
+const attachScreenshot = async (recordData, file, existingPublicId = "") => {
+  if (!file) return recordData;
+  const upload = await uploadImageBufferToCloudinary(file.buffer, file.originalname);
+  if (existingPublicId) {
+    await cloudinary.uploader.destroy(existingPublicId, { resource_type: "image" });
+  }
+  return { ...recordData, screenshotUrl: upload.secureUrl, screenshotPublicId: upload.publicId };
+};
 
 // Get all load board records for the current user
 exports.getAllLoadBoardRecords = async (req, res) => {
@@ -22,7 +41,6 @@ exports.getAllLoadBoardRecords = async (req, res) => {
       data: records,
     });
   } catch (error) {
-    console.error("Error fetching load board records:", error);
     console.error("Error stack:", error.stack);
     res.status(500).json({
       success: false,
@@ -98,10 +116,11 @@ exports.createLoadBoardRecord = async (req, res) => {
     }
 
     // Convert date string to Date object
-    const recordData = {
-      ...req.body,
+    let recordData = {
+      ...parseRecordBody(req.body),
       createdBy: userId,
     };
+    recordData = await attachScreenshot(recordData, req.file);
     
     if (recordData.date && typeof recordData.date === 'string') {
       recordData.date = new Date(recordData.date);
@@ -160,7 +179,15 @@ exports.updateLoadBoardRecord = async (req, res) => {
     }
 
     // Convert date string to Date object if present
-    const updateData = { ...req.body };
+    const existingRecord = await LoadBoard.findOne({ _id: id, createdBy: userId })
+      .select("screenshotPublicId")
+      .lean();
+    if (!existingRecord) {
+      return res.status(404).json({ success: false, message: "Load board record not found" });
+    }
+
+    let updateData = parseRecordBody(req.body);
+    updateData = await attachScreenshot(updateData, req.file, existingRecord.screenshotPublicId);
     if (updateData.date && typeof updateData.date === 'string') {
       updateData.date = new Date(updateData.date);
     }
@@ -238,6 +265,10 @@ exports.deleteLoadBoardRecord = async (req, res) => {
         success: false,
         message: "Load board record not found",
       });
+    }
+
+    if (record.screenshotPublicId) {
+      await cloudinary.uploader.destroy(record.screenshotPublicId, { resource_type: "image" });
     }
 
     res.status(200).json({

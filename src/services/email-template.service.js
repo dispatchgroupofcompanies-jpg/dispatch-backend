@@ -99,7 +99,7 @@ const generateInvoiceEmailHtml = (invoice) => {
                   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                     <tr>
                       <td style="width: 50%; vertical-align: top; padding-right: 20px;">
-                        <div style="font-size: 11px; text-transform: uppercase; color: #64748b; margin: 0 0 6px 0; font-weight: bold; letter-spacing: 0.5px;">XCDGOC PVT LTD:</div>
+                        <div style="font-size: 11px; text-transform: uppercase; color: #64748b; margin: 0 0 6px 0; font-weight: bold; letter-spacing: 0.5px;">Payee:</div>
                         <div>
                           <span style="font-size: 14px; font-weight: bold; color: #dc2626; display: block; margin-bottom: 2px; text-transform: uppercase;">${invoice.payee?.companyName || invoice.payee?.customerName || "N/A"}</span>
                           <div style="color: #475569; font-size: 12px; line-height: 1.3; text-transform: uppercase;">
@@ -113,7 +113,7 @@ const generateInvoiceEmailHtml = (invoice) => {
                         </div>
                       </td>
                       <td style="width: 50%; vertical-align: top; padding-left: 20px;">
-                        <div style="font-size: 11px; text-transform: uppercase; color: #64748b; margin: 0 0 6px 0; font-weight: bold; letter-spacing: 0.5px;">INVOICE TO:</div>
+                        <div style="font-size: 11px; text-transform: uppercase; color: #64748b; margin: 0 0 6px 0; font-weight: bold; letter-spacing: 0.5px;">Pay To:</div>
                         <div>
                           <span style="font-size: 14px; font-weight: bold; color: #2563eb; display: block; margin-bottom: 2px;">${invoice.customer?.companyName || invoice.customer?.customerName || "N/A"}</span>
                           <div style="color: #475569; font-size: 12px; line-height: 1.3; text-transform: uppercase;">

@@ -36,7 +36,10 @@ router.get("/:invoiceId", validateObjectId("invoiceId"), getInvoiceById);
 router.get("/:invoiceId/pdf-link", validateObjectId("invoiceId"), getInvoicePdfLink);
 router.put("/:invoiceId", validateObjectId("invoiceId"), updateInvoice);
 router.delete("/:invoiceId", validateObjectId("invoiceId"), deleteInvoice);
-router.patch("/:invoiceId/status", validateObjectId("invoiceId"), body("invoiceStatus").isIn(["draft", "pending", "approved", "rejected", "paid", "cancelled"]), validateRequest, updateInvoiceStatus);
+// NOTE: "approved" and "rejected" are admin-only decisions and are
+// intentionally excluded here. Users may only manage workflow statuses
+// on their own invoices (e.g. submit as pending, mark paid, cancel).
+router.patch("/:invoiceId/status", validateObjectId("invoiceId"), body("invoiceStatus").isIn(["draft", "pending", "paid", "cancelled"]), validateRequest, updateInvoiceStatus);
 router.get("/:invoiceId/download", validateObjectId("invoiceId"), downloadInvoicePDF);
 
 module.exports = router;

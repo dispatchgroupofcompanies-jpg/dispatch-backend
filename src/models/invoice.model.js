@@ -157,7 +157,21 @@ const invoiceSchema = new mongoose.Schema(
 
     pdfUrl: String,
 
+    paymentStatus: {
+      type: String,
+      default: "pending",
+      lowercase: true,
+      enum: ["pending", "paid"],
+    },
+
+    paymentProofUrl: String,
+
+    paymentProofPublicId: String,
+
+    paidAt: Date,
+
     shareToken: {
+
       type: String,
       unique: true,
       sparse: true,

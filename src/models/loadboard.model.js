@@ -72,6 +72,24 @@ const loadBoardSchema = new mongoose.Schema(
       enum: ["active", "cancelled"],
       default: "active",
     },
+    invoiceStatus: {
+      type: String,
+      enum: ["generated", "pending"],
+      default: "pending",
+    },
+    paymentStatus: {
+      type: String,
+      enum: ["paid", "pending"],
+      default: "pending",
+    },
+    screenshotUrl: {
+      type: String,
+      default: "",
+    },
+    screenshotPublicId: {
+      type: String,
+      default: "",
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -137,6 +155,7 @@ const loadBoardSchema = new mongoose.Schema(
 
 // Add indexes for optimization
 loadBoardSchema.index({ createdBy: 1, createdAt: -1 });
+loadBoardSchema.index({ createdBy: 1, invoiceStatus: 1, paymentStatus: 1, createdAt: -1 });
 loadBoardSchema.index({ status: 1 });
 loadBoardSchema.index({ date: -1 });
 
