@@ -1,11 +1,9 @@
 const Invoice = require("../../models/invoice.model");
 
-// Admin: Get dashboard stats (with user-based access control)
 exports.getDashboardStats = async (req, res) => {
   try {
     const matchQuery = {};
     
-    // If user is not admin, only show their own data
     if (req.accountType !== "admin") {
       const userId = req.user?._id;
       if (!userId) {

@@ -8,14 +8,11 @@ const { getPagination } = require("../../middleware/validation.middleware");
 const { uploadImageBufferToCloudinary, cloudinary } = require("../../services/cloudinary.service");
 
 
-// Admin: Get all invoices with pagination and filters (with user-based access control)
 exports.getAllInvoices = async (req, res) => {
   try {
-    const { page, limit, skip } = getPagination(req.query, { defaultLimit: 24 });
+    const { page, limit, skip } = getPagination(req.query, { defaultLimit: 1000 });
 
     const filter = {};
-    
-    // If user is not admin, only show their own invoices
     if (req.accountType !== "admin") {
       const userId = req.user?._id;
       if (!userId) {
@@ -105,7 +102,6 @@ exports.getAllInvoices = async (req, res) => {
   }
 };
 
-// Admin: Update invoice status (approve/reject)
 exports.updateInvoiceStatus = async (req, res) => {
   try {
     const { id } = req.params;
@@ -221,7 +217,6 @@ exports.updateInvoiceStatus = async (req, res) => {
   }
 };
 
-// Admin: Reject invoice
 exports.rejectInvoice = async (req, res) => {
   try {
     const { id } = req.params;
@@ -252,8 +247,6 @@ exports.rejectInvoice = async (req, res) => {
   }
 };
 
-// Admin: Update payment status (pending/paid). Marking as "paid" requires a
-// payment proof image which is uploaded to Cloudinary.
 exports.updatePaymentStatus = async (req, res) => {
   try {
     const { id } = req.params;
@@ -337,7 +330,6 @@ exports.updatePaymentStatus = async (req, res) => {
   }
 };
 
-// Admin: Download invoice PDF (no ownership check - admins can download any invoice)
 exports.downloadInvoicePDF = async (req, res) => {
 
   try {

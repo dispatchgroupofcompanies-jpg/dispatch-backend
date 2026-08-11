@@ -19,7 +19,13 @@ test("requireAdmin rejects ordinary users", () => {
   const response = createResponse();
   let called = false;
 
-  requireAdmin({ accountType: "user", user: { role: "user" } }, response, () => { called = true; });
+  requireAdmin(
+    { accountType: "user", user: { role: "user" } },
+    response,
+    () => {
+      called = true;
+    },
+  );
 
   assert.equal(called, false);
   assert.equal(response.statusCode, 403);
@@ -30,7 +36,13 @@ test("requireAdmin permits admin accounts", () => {
   const response = createResponse();
   let called = false;
 
-  requireAdmin({ accountType: "admin", user: { role: "admin" } }, response, () => { called = true; });
+  requireAdmin(
+    { accountType: "admin", user: { role: "admin" } },
+    response,
+    () => {
+      called = true;
+    },
+  );
 
   assert.equal(called, true);
   assert.equal(response.statusCode, null);
