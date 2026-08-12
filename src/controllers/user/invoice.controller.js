@@ -5,6 +5,7 @@ const generateInvoiceNumber = require("../../services/invoiceNumber.service");
 const generateInvoicePDF = require("../../services/pdf.service");
 const { generateInvoicePdfBuffer } = generateInvoicePDF;
 const { getPagination } = require("../../middleware/validation.middleware");
+const { buildInvoiceFilename } = require("../../utils/filename.utils");
 
 const createInvoiceWithUniqueNumber = async (payload, maxRetries = 3) => {
   let attempt = 0;
@@ -360,7 +361,7 @@ exports.downloadInvoicePDF = async (req, res) => {
       });
     }
 
-    const filename = `Invoice-${invoice.invoiceNumber}.pdf`;
+    const filename = buildInvoiceFilename(invoice);
 
     // Cloudinary is rejecting raw-file delivery with a 401 ACL error. Send
     // the generated PDF directly to this authenticated request instead.

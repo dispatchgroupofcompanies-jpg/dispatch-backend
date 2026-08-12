@@ -1,4 +1,3 @@
-const Counter = require("../models/Counter");
 const Invoice = require("../models/invoice.model");
 
 const getPayeeKey = (payee = {}) => {
@@ -28,8 +27,8 @@ const getPayeeQuery = (invoice) => {
   return { payeeKey, payeeQueries };
 };
 
-const getHighestNumericFieldValue = async (matchFilter, fieldName) => {
-  const result = await Invoice.aggregate([
+const getSortedNumericFieldValues = async (matchFilter, fieldName) => {
+  const results = await Invoice.aggregate([
     { $match: matchFilter },
     {
       $project: {
@@ -49,15 +48,29 @@ const getHighestNumericFieldValue = async (matchFilter, fieldName) => {
         }
       }
     },
-    { $sort: { numericValue: -1 } },
-    { $limit: 1 }
+    { $match: { numericValue: { $gt: 0 } } },
+    { $sort: { numericValue: 1 } }
   ]);
 
-  return result?.[0]?.numericValue ?? 0;
+  return results.map((item) => item.numericValue);
 };
 
-const getHighestNumericInvoiceNumber = async () => {
-  return getHighestNumericFieldValue(
+const getNextSequentialNumber = (values) => {
+  let next = 1;
+  for (const value of values) {
+    const current = Number(value);
+    if (current < next) continue;
+    if (current === next) {
+      next += 1;
+      continue;
+    }
+    if (current > next) break;
+  }
+  return next;
+};
+
+const getNextInvoiceNumber = async () => {
+  const values = await getSortedNumericFieldValues(
     {
       $or: [
         { invoiceNumber: { $type: "int" } },
@@ -73,10 +86,12 @@ const getHighestNumericInvoiceNumber = async () => {
     },
     "invoiceNumber"
   );
+
+  return getNextSequentialNumber(values);
 };
 
-const getHighestNumericPayeeSerialNumber = async (payeeKey) => {
-  return getHighestNumericFieldValue(
+const getNextPayeeSerialNumber = async (payeeKey) => {
+  const values = await getSortedNumericFieldValues(
     {
       payeeKey,
       $or: [
@@ -93,61 +108,21 @@ const getHighestNumericPayeeSerialNumber = async (payeeKey) => {
     },
     "payeeSerialNumber"
   );
-};
 
-const getNextCounterSequence = async (counterName, seed = 0) => {
-  const pipeline = [
-    {
-      $set: {
-        sequence: {
-          $add: [
-            {
-              $max: [
-                { $ifNull: ["$sequence", seed] },
-                seed
-              ]
-            },
-            1
-          ]
-        }
-      }
-    }
-  ];
-
-  const counter = await Counter.findOneAndUpdate(
-    { name: counterName },
-    pipeline,
-    {
-      upsert: true,
-      returnDocument: "after",
-      updatePipeline: true
-    }
-  );
-
-  return counter.sequence;
+  return getNextSequentialNumber(values);
 };
 
 const generateInvoiceNumber = async (payee) => {
   const payeeKey = getPayeeKey(payee);
-  const counterName = `invoice:${payeeKey}`;
-
-  const [highestGlobalInvoice, highestPayeeInvoice] = await Promise.all([
-    getHighestNumericInvoiceNumber(),
-    getHighestNumericPayeeSerialNumber(payeeKey)
-  ]);
-
-  const payeeInvoiceCount = await Invoice.countDocuments({ payeeKey });
-  const payeeSeed = Math.max(highestPayeeInvoice, payeeInvoiceCount);
-
-  const [globalSequence, payeeSequence] = await Promise.all([
-    getNextCounterSequence("invoice", highestGlobalInvoice),
-    getNextCounterSequence(counterName, payeeSeed)
+  const [invoiceNumber, serialNumber] = await Promise.all([
+    getNextInvoiceNumber(),
+    getNextPayeeSerialNumber(payeeKey),
   ]);
 
   return {
     payeeKey,
-    serialNumber: payeeSequence,
-    invoiceNumber: String(globalSequence)
+    serialNumber,
+    invoiceNumber: String(invoiceNumber),
   };
 };
 

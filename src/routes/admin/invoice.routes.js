@@ -6,7 +6,8 @@ const {
   updateInvoiceStatus,
   rejectInvoice,
   updatePaymentStatus,
-  downloadInvoicePDF
+  downloadInvoicePDF,
+  downloadPaidInvoicePDF,
 } = require("../../controllers/admin/invoice.controller.js");
 
 const authenticate = require("../../middleware/auth.middleware");
@@ -35,6 +36,7 @@ router.get("/", getAllInvoices);
 // Admin Invoice Management
 router.use(requireAdmin);
 router.get("/:id/download", downloadInvoicePDF);
+router.get("/:id/download-paid", downloadPaidInvoicePDF);
 router.patch("/:id/status", updateInvoiceStatus);
 router.patch("/:id/payment-status", paymentProofUpload.single("paymentProof"), updatePaymentStatus);
 router.patch("/rejected/:id/status", rejectInvoice);

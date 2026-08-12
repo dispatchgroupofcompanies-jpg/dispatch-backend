@@ -23,7 +23,7 @@ const maskGstNumber = (gstNumber) => {
   return `******${lastSix}`;
 };
 
-const generateInvoicePdfHtml = (invoice) => {
+const generateInvoicePdfHtml = (invoice, options = {}) => {
   const serialNumber = invoice.payeeSerialNumber ?? invoice.invoiceNumber ?? "N/A";
   const dynamicInvoiceTitle = `INVOICE - #${serialNumber}`;
   const eTransferAddress =
@@ -60,6 +60,24 @@ const generateInvoicePdfHtml = (invoice) => {
   `;
     })
     .join("");
+
+  const paymentProofSection =
+    options.includePaymentProof && invoice.paymentProofUrl
+      ? `
+      <div class="page-break"></div>
+      <div class="proof-section">
+        <h1 class="proof-title">Payment Proof</h1>
+        <p class="proof-description">
+          This page contains the payment proof attached to the invoice and ensures it is included in the final PDF downloaded by the administrator.
+        </p>
+        <img
+          class="proof-image"
+          src="${invoice.paymentProofUrl}"
+          alt="Payment Proof Screenshot"
+        />
+      </div>
+    `
+      : "";
 
   return `
     <!DOCTYPE html>
@@ -228,6 +246,42 @@ const generateInvoicePdfHtml = (invoice) => {
             color: #64748b;
             text-align: right;
           }
+
+          .page-break {
+            page-break-before: always;
+            break-before: page;
+          }
+
+          .proof-section {
+            padding: 16mm 15mm 48mm 15mm;
+            box-sizing: border-box;
+            width: 210mm;
+            min-height: 296mm;
+            display: block;
+          }
+
+          .proof-title {
+            font-size: 28px;
+            font-weight: 900;
+            color: #0f2962;
+            margin-bottom: 16px;
+          }
+
+          .proof-description {
+            font-size: 12px;
+            color: #475569;
+            margin-bottom: 12px;
+            line-height: 1.5;
+          }
+
+          .proof-image {
+            width: 100%;
+            max-height: 240mm;
+            object-fit: contain;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background: #ffffff;
+          }
         </style>
       </head>
       <body>
@@ -350,6 +404,7 @@ const generateInvoicePdfHtml = (invoice) => {
             </table>
           </div>
         </div>
+        ${paymentProofSection}
       </body>
     </html>
   `;

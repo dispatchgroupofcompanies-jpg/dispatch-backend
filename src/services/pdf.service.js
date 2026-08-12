@@ -31,7 +31,7 @@ const PDF_OPTIONS = {
 
 // Produce the PDF once for authenticated downloads, without relying on the
 // access policy of a subsequently delivered Cloudinary raw asset.
-const generateInvoicePdfBuffer = async (invoice) => {
+const generateInvoicePdfBuffer = async (invoice, options = {}) => {
   if (!invoice || !invoice.invoiceNumber) {
     throw new Error("Invalid invoice data");
   }
@@ -41,11 +41,11 @@ const generateInvoicePdfBuffer = async (invoice) => {
     ? invoice.toObject()
     : { ...invoice };
   invoiceForTemplate.payeeSerialNumber = payeeSerialNumber;
-  const html = generateInvoicePdfHtml(invoiceForTemplate);
+  const html = generateInvoicePdfHtml(invoiceForTemplate, options);
   return pdf.generatePdf({ content: html }, PDF_OPTIONS);
 };
 
-const generateInvoicePDF = async (invoice) => {
+const generateInvoicePDF = async (invoice, options = {}) => {
   if (!invoice || !invoice.invoiceNumber) {
     throw new Error("Invalid invoice data");
   }
@@ -58,7 +58,7 @@ const generateInvoicePDF = async (invoice) => {
     const payeeSerialNumber = await getPayeeSerialNumber(invoice);
     const invoiceForTemplate = invoice.toObject ? invoice.toObject() : { ...invoice };
     invoiceForTemplate.payeeSerialNumber = payeeSerialNumber;
-    const html = generateInvoicePdfHtml(invoiceForTemplate);
+    const html = generateInvoicePdfHtml(invoiceForTemplate, options);
     const pdfBuffer = await pdf.generatePdf({ content: html }, PDF_OPTIONS);
 
     const cloudinaryUrl = await uploadPDFBufferToCloudinary(pdfBuffer, fileName, "invoices");
