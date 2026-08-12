@@ -66,10 +66,7 @@ const generateInvoicePdfHtml = (invoice, options = {}) => {
       ? `
       <div class="page-break"></div>
       <div class="proof-section">
-        <h1 class="proof-title">Payment Proof</h1>
-        <p class="proof-description">
-          This page contains the payment proof attached to the invoice and ensures it is included in the final PDF downloaded by the administrator.
-        </p>
+        <!-- Only include the payment proof image so it fits on a single page. Removed large title/description to avoid creating an extra page. -->
         <img
           class="proof-image"
           src="${invoice.paymentProofUrl}"
@@ -98,8 +95,7 @@ const generateInvoicePdfHtml = (invoice, options = {}) => {
             -webkit-print-color-adjust: exact;
             position: relative;
             width: 210mm;
-            height: 296mm;
-            overflow: hidden;
+            /* Let the document flow naturally; avoid forcing a fixed body height which can create an extra empty page. */
           }
 
           @media screen and (max-width: 700px) {
@@ -147,12 +143,11 @@ const generateInvoicePdfHtml = (invoice, options = {}) => {
           .page-container {
             position: relative;
             width: 210mm;
-            height: 296mm;
+            /* Allow content to determine height and rely on page-breaks for pagination. */
             padding: 16mm 15mm 48mm 15mm;
             box-sizing: border-box;
             display: block;
             z-index: 1;
-            overflow: hidden;
           }
 
           .header-section {
@@ -253,11 +248,12 @@ const generateInvoicePdfHtml = (invoice, options = {}) => {
           }
 
           .proof-section {
-            padding: 16mm 15mm 48mm 15mm;
+            /* Make proof-section use natural height and avoid forcing extra full-page min-height that can create an extra blank page. */
+            padding: 16mm 15mm 16mm 15mm;
             box-sizing: border-box;
             width: 210mm;
-            min-height: 296mm;
             display: block;
+            page-break-inside: avoid;
           }
 
           .proof-title {
@@ -276,7 +272,8 @@ const generateInvoicePdfHtml = (invoice, options = {}) => {
 
           .proof-image {
             width: 100%;
-            max-height: 240mm;
+            /* Limit image height to available page space so it fits on a single page */
+            max-height: 232mm;
             object-fit: contain;
             border: 1px solid #e2e8f0;
             border-radius: 8px;
