@@ -3,8 +3,7 @@ const Invoice = require("../models/invoice.model");
 // GET DASHBOARD STATS (user-specific or all for admin)
 const getDashboardStats = async (req, res) => {
   try {
-    console.log("🔍 getDashboardStats - req.user:", req.user ? "exists" : "undefined");
-    console.log("🔍 getDashboardStats - req.accountType:", req.accountType);
+    
     
     let matchQuery = {};
     

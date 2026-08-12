@@ -29,12 +29,15 @@ exports.getAllInvoices = async (req, res) => {
     }
 
     const totalInvoices = await Invoice.countDocuments(filter);
+    
+    // UPDATED: Changed sort to { createdAt: -1 } 
+    // Isse newest invoice Page 1 par sabse pehle (top position) aayega
     const invoices = await Invoice.find(filter)
+      .populate("createdBy", "name email") 
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
 
-    // Calculate carrierNeedToPay and carrierNeedsToReceive for each invoice
     const invoicesWithCalculations = invoices.map(invoice => {
       let totalCarrierNeedToPay = 0;
       let totalCarrierNeedsToReceive = 0;
@@ -45,53 +48,28 @@ exports.getAllInvoices = async (req, res) => {
           const dispatchPercentage = Number(trip.dispatchPercentage || trip.dispatchPercent || 10);
           const dispatchAmount = (totalCharges * dispatchPercentage) / 100;
           
-          // Carrier needs to pay dispatch amount
           totalCarrierNeedToPay += dispatchAmount;
-          // Carrier receives total charges minus dispatch amount
           totalCarrierNeedsToReceive += (totalCharges - dispatchAmount);
         });
       }
 
+      const invObj = invoice.toObject();
+
       return {
-        ...invoice.toObject(),
+        ...invObj,
         carrierNeedToPay: totalCarrierNeedToPay,
-        carrierNeedsToReceive: totalCarrierNeedsToReceive
+        carrierNeedsToReceive: totalCarrierNeedsToReceive,
+        createdByUser: invObj.createdBy ? { name: invObj.createdBy.name, email: invObj.createdBy.email } : null
       };
     });
 
-    // Populate user information for each invoice
-    const invoicesWithUserInfo = await Promise.all(
-      invoicesWithCalculations.map(async (invoice) => {
-        if (invoice.createdBy) {
-          try {
-            const User = require("../../models/user.model");
-            const user = await User.findById(invoice.createdBy).select("name email");
-            return {
-              ...invoice,
-              createdByUser: user ? { name: user.name, email: user.email } : null
-            };
-          } catch (error) {
-            console.error("Error fetching user for invoice:", error);
-            return {
-              ...invoice,
-              createdByUser: null
-            };
-          }
-        }
-        return {
-          ...invoice,
-          createdByUser: null
-        };
-      })
-    );
-
     res.status(200).json({
       success: true,
-      count: invoices.length,
+      count: invoicesWithCalculations.length,
       totalPages: Math.ceil(totalInvoices / limit),
       currentPage: page,
       totalInvoices,
-      data: invoicesWithUserInfo,
+      data: invoicesWithCalculations,
     });
   } catch (error) {
     console.error("Error fetching all invoices:", error);
