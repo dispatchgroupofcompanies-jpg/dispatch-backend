@@ -401,6 +401,12 @@ exports.updateInvoiceStatus = async (req, res) => {
 exports.updatePaymentStatus = async (req, res) => {
   try {
     const { id } = req.params;
+
+    // 🔍 LOG 4: Backend request incoming check
+    console.log("🚀 [Backend Request ID]:", id);
+    console.log("📦 [Backend req.body]:", req.body);
+    console.log("📁 [Backend req.file (Multer Output)]:", req.file);
+
     const status = String(req.body.status || "").toLowerCase();
 
     if (!["pending", "paid"].includes(status)) {
@@ -420,17 +426,23 @@ exports.updatePaymentStatus = async (req, res) => {
 
     if (status === "paid") {
       if (!req.file) {
+        // 🔴 AGAR YE LOG CHALE TO MULTER KO FILE NAHI MILI!
+        console.error("❌ [Error]: req.file is undefined! Check Multer field name mismatch.");
         return res.status(400).json({
           success: false,
           message: "Payment proof image is required to mark the invoice as paid.",
         });
       }
 
+      // Cloudinary Upload Call
       const upload = await uploadImageBufferToCloudinary(
         req.file.buffer,
         req.file.originalname,
         "payment-proofs"
       );
+
+      // 🔍 LOG 5: Cloudinary Output check karein
+      console.log("☁️ [Cloudinary Upload Result]:", upload);
 
       if (invoice.paymentProofPublicId) {
         try {
@@ -443,20 +455,12 @@ exports.updatePaymentStatus = async (req, res) => {
       }
 
       invoice.paymentStatus = "paid";
-      invoice.paymentProofUrl = upload.secureUrl;
-      invoice.paymentProofPublicId = upload.publicId;
+      // ⚠️ Dhyan dein: upload.secureUrl check karein agar upload.secure_url to nahi!
+      invoice.paymentProofUrl = upload.secureUrl || upload.secure_url;
+      invoice.paymentProofPublicId = upload.publicId || upload.public_id;
       invoice.paidAt = new Date();
     } else {
-      if (invoice.paymentProofPublicId) {
-        try {
-          await cloudinary.uploader.destroy(invoice.paymentProofPublicId, {
-            resource_type: "image",
-          });
-        } catch (cleanupError) {
-          console.warn("⚠️ Could not delete payment proof:", cleanupError.message);
-        }
-      }
-
+      // Pending logic...
       invoice.paymentStatus = "pending";
       invoice.paymentProofUrl = undefined;
       invoice.paymentProofPublicId = undefined;
@@ -465,13 +469,16 @@ exports.updatePaymentStatus = async (req, res) => {
 
     await invoice.save();
 
+    // 🔍 LOG 6: Final Saved Invoice Object
+    console.log("✅ [Saved Invoice in DB]:", invoice);
+
     res.status(200).json({
       success: true,
       message: `Payment status updated to ${status} successfully!`,
       data: invoice,
     });
   } catch (error) {
-    console.error("Error updating payment status:", error);
+    console.error("💥 [Error updating payment status]:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error while updating payment status",
