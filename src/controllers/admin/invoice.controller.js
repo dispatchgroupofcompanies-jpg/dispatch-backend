@@ -1,14 +1,123 @@
 const Invoice = require("../../models/invoice.model");
 const path = require("path");
 const axios = require("axios");
+const crypto = require("crypto");
 const sendInvoiceEmail = require("../../services/email.service");
+const generateInvoiceNumber = require("../../services/invoiceNumber.service");
 const generateInvoicePDF = require("../../services/pdf.service");
 const { generateInvoicePdfBuffer } = generateInvoicePDF;
 const { getPagination } = require("../../middleware/validation.middleware");
 const { uploadImageBufferToCloudinary, cloudinary } = require("../../services/cloudinary.service");
 const { buildInvoiceFilename } = require("../../utils/filename.utils");
+const calculateInvoice = require("../../services/invoiceCalculation.service");
 
+// Helper: Handles MongoDB E11000 duplicate serial errors gracefully via auto-retry
+const createInvoiceWithUniqueNumber = async (payload, maxRetries = 3) => {
+  let attempt = 0;
 
+  while (true) {
+    try {
+      return await Invoice.create(payload);
+    } catch (err) {
+      const isDuplicateInvoiceNumber = err.code === 11000 && err.keyPattern?.invoiceNumber;
+      if (isDuplicateInvoiceNumber && attempt < maxRetries) {
+        attempt += 1;
+        const newNumber = await generateInvoiceNumber(payload.payee);
+        payload.invoiceNumber = newNumber.invoiceNumber;
+        payload.payeeKey = newNumber.payeeKey;
+        payload.payeeSerialNumber = newNumber.serialNumber;
+        continue;
+      }
+      throw err;
+    }
+  }
+};
+
+// Admin: Create new invoice directly
+exports.createInvoice = async (req, res) => {
+  try {
+    const data = req.body;
+    if (!data?.trips?.length) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one trip is required to compile an invoice.",
+      });
+    }
+
+    // Run core calculations on provided trips
+    const calculated = calculateInvoice(data.trips);
+
+    // Clean inputs and preserve mixed-case strings
+    const finalizedTrips = calculated.trips.map((calculatedTrip, index) => {
+      const originalTrip = data.trips[index];
+      const cleanVrid = originalTrip?.vrid ? String(originalTrip.vrid).trim() : "";
+
+      return {
+        ...calculatedTrip,
+        vrid: cleanVrid,
+        loadId1: originalTrip?.loadId1 ? String(originalTrip.loadId1).trim() : undefined,
+        loadId2: originalTrip?.loadId2 ? String(originalTrip.loadId2).trim() : undefined,
+        driverName: originalTrip?.driverName ? String(originalTrip.driverName).trim() : undefined,
+        route: originalTrip?.route,
+        pickup: originalTrip?.pickup,
+        drop: originalTrip?.drop,
+      };
+    });
+
+    const generatedNumber = await generateInvoiceNumber(data.payee);
+    const invoicePayload = {
+      ...data,
+      invoiceNumber: generatedNumber.invoiceNumber,
+      payeeKey: generatedNumber.payeeKey,
+      payeeSerialNumber: generatedNumber.serialNumber,
+      trips: finalizedTrips,
+      subtotal: calculated.subtotal,
+      tax: calculated.tax,
+      grandTotal: calculated.grandTotal,
+      invoiceDate: data.invoiceDate ? new Date(data.invoiceDate) : new Date(),
+      createdBy: req.user?._id || null,
+    };
+
+    if (Array.isArray(data.invoicePeriod) && data.invoicePeriod.length === 2) {
+      invoicePayload.invoicePeriod = {
+        startDate: new Date(data.invoicePeriod[0]),
+        endDate: new Date(data.invoicePeriod[1]),
+      };
+    }
+
+    const invoice = await createInvoiceWithUniqueNumber(invoicePayload);
+
+    // Initial PDF generation step
+    try {
+      invoice.pdfUrl = await generateInvoicePDF(invoice);
+      await invoice.save();
+    } catch (err) {
+      console.error("❌ PDF Render Engine Exception encountered:", err.message);
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: "Invoice successfully created by admin.",
+      data: invoice,
+    });
+  } catch (error) {
+    console.error("🔥 ERROR CREATING INVOICE (ADMIN):", error);
+    if (error.name === "ValidationError") {
+      return res.status(400).json({
+        success: false,
+        message: "Validation Error",
+        error: error.message,
+      });
+    }
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error while creating invoice.",
+      error: error.message,
+    });
+  }
+};
+
+// Admin: Get all invoices with financial dispatch metrics
 exports.getAllInvoices = async (req, res) => {
   try {
     const { page, limit, skip } = getPagination(req.query, { defaultLimit: 1000 });
@@ -17,40 +126,38 @@ exports.getAllInvoices = async (req, res) => {
     if (req.accountType !== "admin") {
       const userId = req.user?._id;
       if (!userId) {
-        return res.status(401).json({ 
-          success: false, 
-          message: "User not authenticated" 
+        return res.status(401).json({
+          success: false,
+          message: "User not authenticated",
         });
       }
       filter.createdBy = userId;
     }
-    
+
     if (req.query.status) {
       filter.invoiceStatus = req.query.status.toLowerCase();
     }
 
     const totalInvoices = await Invoice.countDocuments(filter);
-    
-    // UPDATED: Changed sort to { createdAt: -1 } 
-    // Isse newest invoice Page 1 par sabse pehle (top position) aayega
+
     const invoices = await Invoice.find(filter)
-      .populate("createdBy", "name email") 
+      .populate("createdBy", "name email")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
 
-    const invoicesWithCalculations = invoices.map(invoice => {
+    const invoicesWithCalculations = invoices.map((invoice) => {
       let totalCarrierNeedToPay = 0;
       let totalCarrierNeedsToReceive = 0;
 
       if (invoice.trips && invoice.trips.length > 0) {
-        invoice.trips.forEach(trip => {
+        invoice.trips.forEach((trip) => {
           const totalCharges = Number(trip.totalCharges || 0);
           const dispatchPercentage = Number(trip.dispatchPercentage || trip.dispatchPercent || 10);
           const dispatchAmount = (totalCharges * dispatchPercentage) / 100;
-          
+
           totalCarrierNeedToPay += dispatchAmount;
-          totalCarrierNeedsToReceive += (totalCharges - dispatchAmount);
+          totalCarrierNeedsToReceive += totalCharges - dispatchAmount;
         });
       }
 
@@ -60,7 +167,7 @@ exports.getAllInvoices = async (req, res) => {
         ...invObj,
         carrierNeedToPay: totalCarrierNeedToPay,
         carrierNeedsToReceive: totalCarrierNeedsToReceive,
-        createdByUser: invObj.createdBy ? { name: invObj.createdBy.name, email: invObj.createdBy.email } : null
+        createdByUser: invObj.createdBy ? { name: invObj.createdBy.name, email: invObj.createdBy.email } : null,
       };
     });
 
@@ -73,14 +180,134 @@ exports.getAllInvoices = async (req, res) => {
       data: invoicesWithCalculations,
     });
   } catch (error) {
-    console.error("Error fetching all invoices:", error);
+    console.error("❌ Error fetching all invoices:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error while fetching invoices",
+      error: error.message,
     });
   }
 };
 
+exports.getInvoiceById = async (req, res) => {
+  try {
+    const invoice = await Invoice.findById(req.params.id).populate("createdBy", "name email");
+    if (!invoice) {
+      return res.status(404).json({ success: false, message: "Invoice not found." });
+    }
+    return res.json({ success: true, data: invoice });
+  } catch (error) {
+    console.error("Error fetching invoice:", error);
+    return res.status(500).json({ success: false, message: "Unable to fetch invoice." });
+  }
+};
+
+// Admin: Update invoice details and recalculate totals
+exports.updateInvoice = async (req, res) => {
+  try {
+    const invoice = await Invoice.findById(req.params.id);
+    if (!invoice) {
+      return res.status(404).json({ success: false, message: "Invoice not found." });
+    }
+
+    const {
+      invoiceNumber,
+      payeeKey,
+      payeeSerialNumber,
+      createdBy,
+      pdfUrl,
+      paymentStatus,
+      paymentProofUrl,
+      paymentProofPublicId,
+      paidAt,
+      shareToken,
+      shareExpiresAt,
+      emailStatus,
+      emailSentAt,
+      subtotal,
+      tax,
+      grandTotal,
+      payee,
+      trips,
+      invoicePeriod,
+      ...updates
+    } = req.body;
+    Object.assign(invoice, updates);
+
+    if (payee) {
+      invoice.payee = { ...(invoice.payee?.toObject?.() || {}), ...payee };
+    }
+
+    if (Array.isArray(invoicePeriod) && invoicePeriod.length === 2) {
+      invoice.invoicePeriod = {
+        startDate: new Date(invoicePeriod[0]),
+        endDate: new Date(invoicePeriod[1]),
+      };
+    }
+
+    if (trips) {
+      const result = calculateInvoice(trips);
+      invoice.trips = result.trips;
+      invoice.subtotal = result.subtotal;
+      invoice.tax = result.tax;
+      invoice.grandTotal = result.grandTotal;
+    }
+
+    await invoice.save();
+
+    // Re-render PDF to keep document visually in sync
+    try {
+      invoice.pdfUrl = await generateInvoicePDF(invoice);
+      await invoice.save();
+    } catch (pdfErr) {
+      console.error("⚠️ PDF Refresh failed during update:", pdfErr.message);
+    }
+
+    return res.json({
+      success: true,
+      message: "Invoice updated successfully by admin.",
+      data: invoice,
+    });
+  } catch (error) {
+    console.error("Error updating invoice:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Admin: Delete an invoice completely
+exports.deleteInvoice = async (req, res) => {
+  try {
+    const invoice = await Invoice.findById(req.params.id);
+    console.log("Attempting to delete invoice:", invoice?._id);
+    if (!invoice) {
+      return res.status(404).json({ success: false, message: "Invoice not found." });
+    }
+
+    if (String(invoice.invoiceStatus).toLowerCase() === "approved") {
+      return res.status(409).json({
+        success: false,
+        message: "Approved invoices cannot be deleted.",
+      });
+    }
+
+    // Optional: Clean up proof from Cloudinary if attached
+    if (invoice.paymentProofPublicId) {
+      try {
+        await cloudinary.uploader.destroy(invoice.paymentProofPublicId, { resource_type: "image" });
+      } catch (cleanupError) {
+        console.warn("⚠️ Could not delete payment proof asset:", cleanupError.message);
+      }
+    }
+
+    await invoice.deleteOne();
+    return res.json({ success: true, message: "Invoice deleted successfully from database." });
+  } catch (error) {
+    console.error("Error deleting invoice:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Admin: Update status (Approve / Reject) and notify client
 exports.updateInvoiceStatus = async (req, res) => {
   try {
     const { id } = req.params;
@@ -106,46 +333,26 @@ exports.updateInvoiceStatus = async (req, res) => {
       });
     }
 
-    // Send email when invoice is approved
     let emailSent = false;
     let emailError = null;
-    
+
     if (status === "approved") {
       try {
-        console.log(`📧 Attempting to send approval email for invoice: ${updatedInvoice.invoiceNumber}`);
-        console.log(`📧 Invoice pdfUrl from DB: ${updatedInvoice.pdfUrl}`);
-        
-        // Determine the correct PDF path/URL
         let pdfPath = updatedInvoice.pdfUrl;
-        
-        // If pdfUrl is a Cloudinary URL (starts with http), use it directly
-        if (pdfPath && (pdfPath.startsWith("http://") || pdfPath.startsWith("https://"))) {
-          console.log(`📧 Using Cloudinary URL: ${pdfPath}`);
-        } 
-        // If pdfUrl is empty or invalid, we need to regenerate the PDF
-        else {
-          console.log(`⚠️ pdfUrl is missing or invalid, regenerating PDF...`);
-          const generateInvoicePDF = require("../../services/pdf.service");
+
+        if (!pdfPath || (!pdfPath.startsWith("http://") && !pdfPath.startsWith("https://"))) {
           pdfPath = await generateInvoicePDF(updatedInvoice);
-          
-          // Save the Cloudinary URL back to the invoice
           updatedInvoice.pdfUrl = pdfPath;
           await updatedInvoice.save();
-          console.log(`✅ PDF regenerated and URL saved: ${pdfPath}`);
         }
-        
-        console.log(`📧 Final PDF Path/URL: ${pdfPath}`);
-        
+
         const recipientsList = [
           updatedInvoice.customer?.email,
           updatedInvoice.payee?.email,
-          "xcdgoc@gmail.com"
+          "xcdgoc@gmail.com",
         ].filter(Boolean);
-        
 
         if (recipientsList.length > 0) {
-          // Attach the exact PDF produced from the backend invoice template.
-          // This never depends on Cloudinary allowing a subsequent download.
           const pdfAttachment = await generateInvoicePdfBuffer(updatedInvoice);
           await sendInvoiceEmail(
             recipientsList,
@@ -155,32 +362,26 @@ exports.updateInvoiceStatus = async (req, res) => {
             null,
             updatedInvoice.toObject()
           );
-          
+
           updatedInvoice.emailStatus = "sent";
           updatedInvoice.emailSentAt = new Date();
           await updatedInvoice.save();
-          
+
           emailSent = true;
-          console.log(`✅ Email sent successfully for invoice: ${updatedInvoice.invoiceNumber}`);
-        } else {
-          console.warn(`⚠️ No recipients found for invoice: ${updatedInvoice.invoiceNumber}`);
         }
       } catch (mailErr) {
         console.error("❌ Email delivery failed:", mailErr);
-        console.error("Error details:", mailErr.message);
-        if (mailErr.code) console.error("Error code:", mailErr.code);
         emailError = mailErr;
         updatedInvoice.emailStatus = "failed";
         await updatedInvoice.save();
-        // Don't throw - we still want to return success for the status update
       }
     }
 
-    const responseMessage = emailError 
+    const responseMessage = emailError
       ? `Invoice status updated to ${status} successfully! However, email notification failed to send.`
-      : emailSent 
-        ? `Invoice status updated to ${status} successfully! Approval email sent.`
-        : `Invoice status updated to ${status} successfully!`;
+      : emailSent
+      ? `Invoice status updated to ${status} successfully! Approval email sent.`
+      : `Invoice status updated to ${status} successfully!`;
 
     res.status(200).json({
       success: true,
@@ -196,36 +397,7 @@ exports.updateInvoiceStatus = async (req, res) => {
   }
 };
 
-exports.rejectInvoice = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const updatedInvoice = await Invoice.findByIdAndUpdate(
-      id,
-      { invoiceStatus: "rejected" },
-      { returnDocument: "after", runValidators: true }
-    );
-
-    if (!updatedInvoice) {
-      return res.status(404).json({
-        success: false,
-        message: "Invoice not found",
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Invoice rejected successfully",
-      data: updatedInvoice,
-    });
-  } catch (error) {
-    console.error("Error rejecting invoice:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error while rejecting invoice",
-    });
-  }
-};
-
+// Admin: Direct payment status update and proof upload handling
 exports.updatePaymentStatus = async (req, res) => {
   try {
     const { id } = req.params;
@@ -260,7 +432,6 @@ exports.updatePaymentStatus = async (req, res) => {
         "payment-proofs"
       );
 
-      // Remove any previously uploaded proof so Cloudinary stays clean.
       if (invoice.paymentProofPublicId) {
         try {
           await cloudinary.uploader.destroy(invoice.paymentProofPublicId, {
@@ -276,7 +447,6 @@ exports.updatePaymentStatus = async (req, res) => {
       invoice.paymentProofPublicId = upload.publicId;
       invoice.paidAt = new Date();
     } else {
-      // Switching back to pending removes the stored proof.
       if (invoice.paymentProofPublicId) {
         try {
           await cloudinary.uploader.destroy(invoice.paymentProofPublicId, {
@@ -309,6 +479,7 @@ exports.updatePaymentStatus = async (req, res) => {
   }
 };
 
+// Admin: Standard PDF download
 exports.downloadInvoicePDF = async (req, res) => {
   try {
     const invoice = await Invoice.findById(req.params.id);
@@ -317,8 +488,8 @@ exports.downloadInvoicePDF = async (req, res) => {
     }
 
     const filename = buildInvoiceFilename(invoice);
-
     const pdfBuffer = await generateInvoicePdfBuffer(invoice);
+
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.setHeader("Content-Length", pdfBuffer.length);
@@ -329,6 +500,7 @@ exports.downloadInvoicePDF = async (req, res) => {
   }
 };
 
+// Admin: PDF download including payment receipt proof page
 exports.downloadPaidInvoicePDF = async (req, res) => {
   try {
     const invoice = await Invoice.findById(req.params.id);

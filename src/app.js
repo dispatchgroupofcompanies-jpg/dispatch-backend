@@ -13,6 +13,7 @@ const companyRoutes = require("./routes/companyRoutes");
 const adminDashboardRoutes = require("./routes/admin/dashboard.routes");
 const adminInvoiceRoutes = require("./routes/admin/invoice.routes");
 const adminAppointmentRoutes = require("./routes/admin/appointment.routes");
+const adminLoadboardRoutes = require("./routes/admin/loadboard.routes");
 const adminUserRoutes = require("./routes/admin/user.routes");
 const adminRoutes = require("./routes/admin.routes");
 
@@ -20,9 +21,6 @@ const adminRoutes = require("./routes/admin.routes");
 const publicRoutes = require("./routes/public.routes");
 
 // User Routes
-const userInvoiceRoutes = require("./routes/user/invoice.routes");
-const userAppointmentRoutes = require("./routes/user/appointment.routes");
-const userDashboardRoutes = require("./routes/user/dashboard.routes");
 const userLoadBoardRoutes = require("./routes/user/loadboard.routes");
 
 
@@ -89,18 +87,13 @@ app.use("/api/admin/dashboard", adminDashboardRoutes);
 app.use("/api/admin/invoices", adminInvoiceRoutes);
 app.use("/api/admin/appointments", adminAppointmentRoutes);
 app.use("/api/admin/users", adminUserRoutes);
+app.use("/api/admin/loadboard", adminLoadboardRoutes);
 app.use("/api/admin", adminRoutes);
 
 // User Routes
-app.use("/api/user/invoices", userInvoiceRoutes);
-app.use("/api/user/appointments", userAppointmentRoutes);
-app.use("/api/user/dashboard", userDashboardRoutes);
 app.use("/api/user/loadboard", userLoadBoardRoutes);
 
-// Backward-compatible aliases. They use the same authenticated, ownership-
-// checked user routers rather than the retired legacy controllers.
-app.use("/api/invoices", userInvoiceRoutes);
-app.use("/api/appointments", userAppointmentRoutes);
+// Invoices and appointments are intentionally admin-only.
 
 // Public Routes
 app.use("/api", publicRoutes);

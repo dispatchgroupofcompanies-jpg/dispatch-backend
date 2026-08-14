@@ -4,6 +4,29 @@ const Appointment = require("../../models/appointment.model");
 const sendInvoiceEmail = require("../../services/email.service");
 const generateAppointmentPDF = require("../../services/appointment-pdf.service");
 
+// Admin: Create an appointment
+exports.createAppointment = async (req, res) => {
+  try {
+    const appointment = await Appointment.create({
+      ...req.body,
+      userId: req.user?._id,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Appointment created successfully.",
+      data: appointment,
+    });
+  } catch (error) {
+    console.error("Error creating appointment:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to create appointment.",
+      error: error.message,
+    });
+  }
+};
+
 // Admin: Get all appointments (with user-based access control)
 exports.getAppointments = async (req, res) => {
   try {

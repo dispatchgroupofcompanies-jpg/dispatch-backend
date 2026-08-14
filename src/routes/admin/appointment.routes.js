@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 const {
+  createAppointment,
   getAppointments,
   getAppointmentById,
   updateAppointmentStatus,
@@ -14,6 +15,8 @@ const { requireAdmin } = require("../../middleware/authorize.middleware");
 
 // All admin appointment routes require authentication
 router.use(authenticate, requireAdmin);
+
+router.post("/", createAppointment);
 
 // Get all appointments
 router.get("/", getAppointments);

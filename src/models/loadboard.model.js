@@ -25,10 +25,6 @@ const loadBoardSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
-    load2Id: {
-      type: String,
-      trim: true,
-    },
     vrid: {
       type: String,
       trim: true,
@@ -49,14 +45,17 @@ const loadBoardSchema = new mongoose.Schema(
     },
     tripCharges: {
       type: Number,
+      required: [true, "Trip charges are required"],
       min: 0,
     },
     dispatcher: {
       type: String,
+      required: [true, "Dispatcher is required"],
       trim: true,
     },
     driverName: {
       type: String,
+      required: [true, "Payment ID is required"],
       trim: true,
     },
     dispatchCharges: {

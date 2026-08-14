@@ -16,6 +16,29 @@ const {
 
 router.use(authenticate, requireAdmin);
 
+// 🔥 DEBUG: Check current user's auth status
+router.get("/auth-check", (req, res) => {
+  try {
+    return res.status(200).json({
+      success: true,
+      message: "User is authenticated and authorized as admin",
+      user: {
+        id: req.user?._id,
+        name: req.user?.name,
+        email: req.user?.email,
+        role: req.user?.role,
+      },
+      accountType: req.accountType,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Error checking auth status",
+      error: error.message,
+    });
+  }
+});
+
 // 🔥 ADMIN PASSWORD RESET ROUTE
 router.post("/reset-password", resetAdminPassword);
 

@@ -157,6 +157,9 @@ exports.createLoadBoardRecord = async (req, res) => {
     });
   } catch (error) {
     console.error("Error creating load board record:", error);
+    if (error.name === "ValidationError") {
+      return res.status(400).json({ success: false, message: error.message });
+    }
     res.status(500).json({
       success: false,
       message: "Internal server error while creating load board record",
@@ -234,6 +237,9 @@ exports.updateLoadBoardRecord = async (req, res) => {
     });
   } catch (error) {
     console.error("Error updating load board record:", error);
+    if (error.name === "ValidationError") {
+      return res.status(400).json({ success: false, message: error.message });
+    }
     res.status(500).json({
       success: false,
       message: "Internal server error while updating load board record",
