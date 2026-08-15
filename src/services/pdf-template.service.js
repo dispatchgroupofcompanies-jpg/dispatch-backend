@@ -288,6 +288,12 @@ const generateInvoicePdfHtml = (invoice, options = {}) => {
           <!-- Header Section -->
           <div class="header-section">
             <h1 class="invoice-title">${dynamicInvoiceTitle}</h1>
+            <div style="margin-top: 8px; color: #64748b; font-size: 8px; line-height: 1.15; font-weight: bold; letter-spacing: 0.2px;">
+              All invoices are non HST/GST<br/>
+              We are not responsible for your previous record more than 30 days<br/>
+              Rest later for further previous invoices record<br/>
+              Of 03 months we will charge you $50
+            </div>
           </div>
 
           <!-- Company Details Section -->
@@ -389,12 +395,18 @@ const generateInvoicePdfHtml = (invoice, options = {}) => {
                   </div>
                 </td>
                 <td style="width: 45%; vertical-align: top;">
-                  <div class="footer-right-copy">
+                  <div class="footer-right-copy" style="font-size: 8px; line-height: 1.15;">
                     Open Board, Bison, Walmart, Load Link<br/>
                     and Non Amazon Dispatch Solutions<br/><br/>
-                    <b>Contact :</b> xcdgoc@gmail.com<br/>
-                    +91 750 121 6555<br/>
-                    Shahid ul islam
+                    <b>Contact:</b> <span style="color: #dc2626; font-weight: bold;">BUSINESS HEAD SHAHID UL ISLAM</span><br/>
+                    EXTREME CANADA DISPATCH GROUP OF COMPANIES<br/>
+                    DIN 11644512<br/>
+                    TAN AMRX10063E<br/>
+                    CIN U52241JK20260PC018999<br/>
+                    business@xcdgocpvtltd.com<br/>
+                    xcdgocpvtltd@gmail.com<br/>
+                    +1 519 191 0142<br/>
+                    +91 750 121 6555
                   </div>
                 </td>
               </tr>

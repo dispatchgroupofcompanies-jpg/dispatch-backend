@@ -96,6 +96,12 @@ const generateInvoiceEmailHtml = (invoice) => {
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 20px;">
               <tr>
                 <td style="padding: 12px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px;">
+                  <div style="margin: 0 0 12px 0; color: #64748b; font-size: 8px; line-height: 1.15; font-weight: bold;">
+                    All invoices are non HST/GST<br/>
+                    We are not responsible for your previous record more than 30 days<br/>
+                    Rest later for further previous invoices record<br/>
+                    Of 03 months we will charge you $50
+                  </div>
                   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                     <tr>
                       <td style="width: 50%; vertical-align: top; padding-right: 20px;">
@@ -219,9 +225,15 @@ const generateInvoiceEmailHtml = (invoice) => {
                   <p style="margin: 0; font-size: 11px; line-height: 1.4; color: #64748b;">
                     Open Board, Bision, Walmart, Load Link<br/>
                     and Non Amazon Dispatch Solutions<br/><br/>
-                    <strong>Contact:</strong> xcdgoc@gmail.com<br/>
-                    +91 750 121 6555<br/>
-                    Shahid ul islam
+                    <strong>Contact:</strong> <span style="color: #dc2626; font-weight: bold;">BUSINESS HEAD SHAHID UL ISLAM</span><br/>
+                    EXTREME CANADA DISPATCH GROUP OF COMPANIES<br/>
+                    DIN 11644512<br/>
+                    TAN AMRX10063E<br/>
+                    CIN U52241JK20260PC018999<br/>
+                    business@xcdgocpvtltd.com<br/>
+                    xcdgocpvtltd@gmail.com<br/>
+                    +1 519 191 0142<br/>
+                    +91 750 121 6555
                   </p>
                 </td>
               </tr>
