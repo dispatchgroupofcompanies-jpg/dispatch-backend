@@ -8,13 +8,13 @@ const formatCurrency = (amount, currency = "CAD") => {
 
 const formatDate = (dateStr) => {
   if (!dateStr) return "N/A";
-  return new Date(dateStr)
-    .toLocaleDateString("en-CA", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    })
-    .replace(/\//g, "-");
+  
+  // Using "en-GB" formats directly as DD/MM/YYYY
+  return new Date(dateStr).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
 };
 
 const maskGstNumber = (gstNumber) => {
