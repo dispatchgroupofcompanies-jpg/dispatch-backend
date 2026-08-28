@@ -120,7 +120,13 @@ exports.createInvoice = async (req, res) => {
 // Admin: Get all invoices with financial dispatch metrics
 exports.getAllInvoices = async (req, res) => {
   try {
-    const { page, limit, skip } = getPagination(req.query, { defaultLimit: 1000 });
+    // Forcefully request 1000 if not provided in query
+    const requestedLimit = parseInt(req.query.limit, 10) || 1000;
+    const requestedPage = parseInt(req.query.page, 10) || 1;
+
+    // Direct calculation to bypass helper restrictions if needed
+    const limit = requestedLimit;
+    const skip = (requestedPage - 1) * limit;
 
     const filter = {};
     if (req.accountType !== "admin") {
@@ -144,7 +150,8 @@ exports.getAllInvoices = async (req, res) => {
       .populate("createdBy", "name email")
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .lean(); // .lean() use karne se performance fast hogi aur .toObject() ki zaroorat nahi padegi
 
     const invoicesWithCalculations = invoices.map((invoice) => {
       let totalCarrierNeedToPay = 0;
@@ -161,13 +168,11 @@ exports.getAllInvoices = async (req, res) => {
         });
       }
 
-      const invObj = invoice.toObject();
-
       return {
-        ...invObj,
+        ...invoice,
         carrierNeedToPay: totalCarrierNeedToPay,
         carrierNeedsToReceive: totalCarrierNeedsToReceive,
-        createdByUser: invObj.createdBy ? { name: invObj.createdBy.name, email: invObj.createdBy.email } : null,
+        createdByUser: invoice.createdBy ? { name: invoice.createdBy.name, email: invoice.createdBy.email } : null,
       };
     });
 
@@ -175,7 +180,7 @@ exports.getAllInvoices = async (req, res) => {
       success: true,
       count: invoicesWithCalculations.length,
       totalPages: Math.ceil(totalInvoices / limit),
-      currentPage: page,
+      currentPage: requestedPage,
       totalInvoices,
       data: invoicesWithCalculations,
     });
