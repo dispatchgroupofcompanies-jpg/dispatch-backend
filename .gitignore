@@ -1,5 +1,6 @@
 # Dependency folders
 node_modules/
+.cache/puppeteer/
 
 # Environment variables (Never push your secrets!)
 .env

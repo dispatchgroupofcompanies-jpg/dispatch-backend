@@ -1,32 +1,27 @@
-const pdf = require("html-pdf-node");
+const puppeteer = require("puppeteer");
 const { uploadPDFBufferToCloudinary } = require("./cloudinary.service");
 const { generateInvoicePdfHtml } = require("./pdf-template.service");
 const { getPayeeSerialNumber } = require("./invoiceNumber.service");
 
-// Configure Puppeteer to use system-installed Chromium (optimized for VPS)
-const chromiumPath = process.env.PUPPETEER_EXECUTABLE_PATH || 
-                     (process.platform === "linux" ? "/usr/bin/chromium-browser" : null) ||
-                     (process.platform === "linux" ? "/snap/bin/chromium" : null);
-
-if (chromiumPath && !process.env.PUPPETEER_EXECUTABLE_PATH) {
-  process.env.PUPPETEER_EXECUTABLE_PATH = chromiumPath;
-}
-
-// PDF generation options (pre-configured for performance)
+// PDF generation options
 const PDF_OPTIONS = {
   format: "A4",
   printBackground: true,
   preferCSSPageSize: true,
   margin: { top: 0, right: 0, bottom: 0, left: 0 },
-  launchOptions: {
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu",
-      "--single-process",
-    ],
-  },
+};
+
+const renderPdf = async (html) => {
+  const browser = await puppeteer.launch({
+    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+  });
+  try {
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: "networkidle0" });
+    return Buffer.from(await page.pdf(PDF_OPTIONS));
+  } finally {
+    await browser.close();
+  }
 };
 
 // Produce the PDF once for authenticated downloads, without relying on the
@@ -42,7 +37,7 @@ const generateInvoicePdfBuffer = async (invoice, options = {}) => {
     : { ...invoice };
   invoiceForTemplate.payeeSerialNumber = payeeSerialNumber;
   const html = generateInvoicePdfHtml(invoiceForTemplate, options);
-  return pdf.generatePdf({ content: html }, PDF_OPTIONS);
+  return renderPdf(html);
 };
 
 const generateInvoicePDF = async (invoice, options = {}) => {
@@ -59,7 +54,7 @@ const generateInvoicePDF = async (invoice, options = {}) => {
     const invoiceForTemplate = invoice.toObject ? invoice.toObject() : { ...invoice };
     invoiceForTemplate.payeeSerialNumber = payeeSerialNumber;
     const html = generateInvoicePdfHtml(invoiceForTemplate, options);
-    const pdfBuffer = await pdf.generatePdf({ content: html }, PDF_OPTIONS);
+    const pdfBuffer = await renderPdf(html);
 
     const cloudinaryUrl = await uploadPDFBufferToCloudinary(pdfBuffer, fileName, "invoices");
     return cloudinaryUrl;

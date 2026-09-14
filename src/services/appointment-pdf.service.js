@@ -1,15 +1,6 @@
 const pdf = require("html-pdf-node");
 const { uploadPDFBufferToCloudinary } = require("./cloudinary.service");
 
-// Configure Puppeteer to use system-installed Chromium (optimized for VPS)
-const chromiumPath = process.env.PUPPETEER_EXECUTABLE_PATH || 
-                     (process.platform === "linux" ? "/usr/bin/chromium-browser" : null) ||
-                     (process.platform === "linux" ? "/snap/bin/chromium" : null);
-
-if (chromiumPath && !process.env.PUPPETEER_EXECUTABLE_PATH) {
-  process.env.PUPPETEER_EXECUTABLE_PATH = chromiumPath;
-}
-
 // PDF generation options (pre-configured for performance)
 const PDF_OPTIONS = {
   format: "A4",
