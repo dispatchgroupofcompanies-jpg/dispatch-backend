@@ -5,8 +5,7 @@ const addUser = require("../models/addUsers.js");
 const { getJwtSecret } = require("../config/env");
 const authMiddleware = async (req, res, next) => {
   try {
-    // 1. Extract token from header
-    const token = req.header("Authorization")?.replace(/^Bearer\s+/i, "") || req.cookies?.token;
+    const token = req.cookies?.token;
 
     if (!token) {
       return res.status(401).json({
@@ -16,7 +15,7 @@ const authMiddleware = async (req, res, next) => {
     }
 
     // 2. Verify token
-    const decoded = jwt.verify(token, getJwtSecret());
+    const decoded = jwt.verify(token, getJwtSecret(), { algorithms: ["HS256"] });
 
     // 3. Determine if it's a User or an Admin (Checks decoded.id or decoded._id)
     const targetId = decoded.id || decoded._id || decoded.userId;
@@ -67,6 +66,7 @@ const authMiddleware = async (req, res, next) => {
     // 5. Attach the authenticated entity to the request object
     req.user = account;
     req.accountType = accountType; // Accessible in controllers if you need to enforce roles
+    res.setHeader("Cache-Control", "no-store");
     
     next();
   } catch (error) {

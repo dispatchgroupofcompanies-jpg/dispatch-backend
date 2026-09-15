@@ -144,14 +144,15 @@ exports.getAllInvoices = async (req, res) => {
       filter.invoiceStatus = req.query.status.toLowerCase();
     }
 
-    const totalInvoices = await Invoice.countDocuments(filter);
-
-    const invoices = await Invoice.find(filter)
+    const [totalInvoices, invoices] = await Promise.all([
+      Invoice.countDocuments(filter),
+      Invoice.find(filter)
       .populate("createdBy", "name email")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .lean(); // .lean() use karne se performance fast hogi aur .toObject() ki zaroorat nahi padegi
+      .lean(),
+    ]);
 
     const invoicesWithCalculations = invoices.map((invoice) => {
       let totalCarrierNeedToPay = 0;

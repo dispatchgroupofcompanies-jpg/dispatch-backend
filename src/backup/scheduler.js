@@ -8,6 +8,7 @@ const { runSyncWorker } = require('./syncWorker');
 
 let isWorkerRunning = false;
 let intervalId = null;
+let startupTimeoutId = null;
 
 async function executeTask() {
   if (isWorkerRunning) {
@@ -35,7 +36,8 @@ function startScheduler() {
   const intervalMs = minutes * 60 * 1000;
 
   // Initial delay of 5 seconds to let primary server startup complete
-  setTimeout(() => {
+  startupTimeoutId = setTimeout(() => {
+    startupTimeoutId = null;
     executeTask();
   }, 5000);
 
@@ -47,6 +49,10 @@ function startScheduler() {
 }
 
 function stopScheduler() {
+  if (startupTimeoutId) {
+    clearTimeout(startupTimeoutId);
+    startupTimeoutId = null;
+  }
   if (intervalId) {
     clearInterval(intervalId);
     intervalId = null;

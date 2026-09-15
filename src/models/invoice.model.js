@@ -211,4 +211,9 @@ const invoiceSchema = new mongoose.Schema(
 invoiceSchema.index({ createdBy: 1, createdAt: -1 });
 invoiceSchema.index({ payeeKey: 1, payeeSerialNumber: 1 });
 
+// Non-unique indexes for existing list filters and sort order.
+invoiceSchema.index({ createdAt: -1 });
+invoiceSchema.index({ invoiceStatus: 1, createdAt: -1 });
+invoiceSchema.index({ createdBy: 1, invoiceStatus: 1, createdAt: -1 });
+
 module.exports = mongoose.model("Invoice", invoiceSchema);

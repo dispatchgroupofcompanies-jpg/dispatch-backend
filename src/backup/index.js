@@ -47,4 +47,5 @@ function handleShutdown() {
 
 module.exports = {
   startBackupWorker,
+  stopScheduler,
 };

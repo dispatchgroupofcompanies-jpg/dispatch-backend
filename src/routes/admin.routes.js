@@ -3,7 +3,7 @@ const router = express.Router();
 const authenticate = require("../middleware/auth.middleware");
 const { requireAdmin } = require("../middleware/authorize.middleware");
 
-const { resetAdminPassword, getAdminProfile } = require("../controllers/admin.controller");
+const { resetAdminPassword, getAdminProfile } = require("../controllers/admin/account.controller");
 const {
   getAllDeviceRequests,
   getPendingDeviceRequests,

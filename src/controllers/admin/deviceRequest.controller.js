@@ -22,18 +22,19 @@ exports.getAllDeviceRequests = async (req, res) => {
           { email: { $regex: search, $options: "i" } },
           { name: { $regex: search, $options: "i" } },
         ],
-      }).select("_id");
+      }).select("_id").lean();
 
       query.userId = { $in: users.map((u) => u._id) };
     }
 
-    const deviceRequests = await DeviceRequest.find(query)
+    const [deviceRequests, total] = await Promise.all([
+      DeviceRequest.find(query)
       .populate("userId", "name email role")
       .sort({ requestedAt: -1 })
       .limit(limit * 1)
-      .skip((page - 1) * limit);
-
-    const total = await DeviceRequest.countDocuments(query);
+      .skip((page - 1) * limit),
+      DeviceRequest.countDocuments(query),
+    ]);
 
     return res.json({
       success: true,
@@ -66,18 +67,19 @@ exports.getPendingDeviceRequests = async (req, res) => {
           { email: { $regex: search, $options: "i" } },
           { name: { $regex: search, $options: "i" } },
         ],
-      }).select("_id");
+      }).select("_id").lean();
 
       query.userId = { $in: users.map((u) => u._id) };
     }
 
-    const deviceRequests = await DeviceRequest.find(query)
+    const [deviceRequests, total] = await Promise.all([
+      DeviceRequest.find(query)
       .populate("userId", "name email role")
       .sort({ requestedAt: -1 })
       .limit(limit * 1)
-      .skip((page - 1) * limit);
-
-    const total = await DeviceRequest.countDocuments(query);
+      .skip((page - 1) * limit),
+      DeviceRequest.countDocuments(query),
+    ]);
 
     return res.json({
       success: true,
@@ -252,18 +254,22 @@ exports.revokeDeviceRequest = async (req, res) => {
 // Get device request statistics
 exports.getDeviceRequestStats = async (req, res) => {
   try {
-    const total = await DeviceRequest.countDocuments();
-    const pending = await DeviceRequest.countDocuments({ status: "pending" });
-    const approved = await DeviceRequest.countDocuments({ status: "approved" });
-    const rejected = await DeviceRequest.countDocuments({ status: "rejected" });
-
-    // Get recent pending requests (last 7 days)
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const recentPending = await DeviceRequest.countDocuments({
-      status: "pending",
-      requestedAt: { $gte: sevenDaysAgo },
-    });
+    const totals = await DeviceRequest.aggregate([
+      { $group: {
+        _id: null,
+        total: { $sum: 1 },
+        pending: { $sum: { $cond: [{ $eq: ["$status", "pending"] }, 1, 0] } },
+        approved: { $sum: { $cond: [{ $eq: ["$status", "approved"] }, 1, 0] } },
+        rejected: { $sum: { $cond: [{ $eq: ["$status", "rejected"] }, 1, 0] } },
+        recentPending: { $sum: { $cond: [{ $and: [
+          { $eq: ["$status", "pending"] },
+          { $gte: ["$requestedAt", sevenDaysAgo] },
+        ] }, 1, 0] } },
+      } },
+    ]);
+    const { total = 0, pending = 0, approved = 0, rejected = 0, recentPending = 0 } = totals[0] || {};
 
     return res.json({
       success: true,

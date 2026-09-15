@@ -274,4 +274,8 @@ const appointmentSchema = new mongoose.Schema(
   }
 );
 
+// Non-unique indexes for existing list filters and sort order.
+appointmentSchema.index({ createdAt: -1 });
+appointmentSchema.index({ userId: 1, createdAt: -1 });
+
 module.exports = mongoose.model("Appointment", appointmentSchema);

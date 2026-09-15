@@ -5,24 +5,10 @@ const morgan = require("morgan");
 const helmet = require("helmet");
 const { apiLimiter } = require("./middleware/rateLimiter");
 const errorHandler = require("./middleware/error.middleware");
+const { requireTrustedOrigin } = require("./middleware/csrf.middleware");
 
-const authRoutes = require("./routes/auth.routes");
-const companyRoutes = require("./routes/companyRoutes");
-
-// Admin Routes
-const adminDashboardRoutes = require("./routes/admin/dashboard.routes");
-const adminInvoiceRoutes = require("./routes/admin/invoice.routes");
-const adminAppointmentRoutes = require("./routes/admin/appointment.routes");
-const adminLoadboardRoutes = require("./routes/admin/loadboard.routes");
-const adminUserRoutes = require("./routes/admin/user.routes");
-const adminRoutes = require("./routes/admin.routes");
-
-// Public Routes (no authentication required)
-const publicRoutes = require("./routes/public.routes");
-
-// User Routes
-const userLoadBoardRoutes = require("./routes/user/loadboard.routes");
-
+const { allowedOrigins, corsOptions } = require("./config/cors");
+const registerRoutes = require("./routes");
 
 const app = express();
 
@@ -31,28 +17,7 @@ const app = express();
 app.set("trust proxy", 1);
 
 // 2. CORE CORS MIDDLEWARE
-const allowedOrigins = process.env.FRONTEND_URL 
-  ? process.env.FRONTEND_URL.split(',').map(url => url.trim()).filter(url => url)
-  : ["http://localhost:3000"];
-
-app.use(cors({
-  origin: function(origin, callback) {
-    if (!origin) {
-      return callback(null, true);
-    }
-    
-    const isAllowed = allowedOrigins.indexOf(origin) !== -1;
-    
-    if (isAllowed) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-}));
+app.use(cors(corsOptions));
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
 app.use(express.json({ limit: "1mb" }));
@@ -66,6 +31,7 @@ app.use((err, req, res, next) => {
 });
 
 app.use(cookieParser());
+app.use(requireTrustedOrigin(allowedOrigins));
 app.use(morgan("dev"));
 
 // 3. ROOT / HEALTH CHECK ROUTE
@@ -76,27 +42,7 @@ app.get("/", (req, res) => {
 // Apply general API rate limiting
 app.use("/api", apiLimiter);
 
-// 7. APPLICATION API ROUTES
-
-// Shared Routes
-app.use("/api/auth", authRoutes);
-app.use("/api/company", companyRoutes);
-
-// Admin Routes
-app.use("/api/admin/dashboard", adminDashboardRoutes);
-app.use("/api/admin/invoices", adminInvoiceRoutes);
-app.use("/api/admin/appointments", adminAppointmentRoutes);
-app.use("/api/admin/users", adminUserRoutes);
-app.use("/api/admin/loadboard", adminLoadboardRoutes);
-app.use("/api/admin", adminRoutes);
-
-// User Routes
-app.use("/api/user/loadboard", userLoadBoardRoutes);
-
-// Invoices and appointments are intentionally admin-only.
-
-// Public Routes
-app.use("/api", publicRoutes);
+registerRoutes(app);
 
 app.use(errorHandler);
 

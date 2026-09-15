@@ -158,4 +158,7 @@ loadBoardSchema.index({ createdBy: 1, invoiceStatus: 1, paymentStatus: 1, create
 loadBoardSchema.index({ status: 1 });
 loadBoardSchema.index({ date: -1 });
 
+// Non-unique indexes for existing list filters and sort order.
+loadBoardSchema.index({ createdAt: -1 });
+
 module.exports = mongoose.model("LoadBoard", loadBoardSchema);

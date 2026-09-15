@@ -15,32 +15,22 @@ exports.getDashboardStats = async (req, res) => {
       matchQuery.createdBy = userId;
     }
 
-    // Total Invoices
-    const totalInvoices = await Invoice.countDocuments(matchQuery);
-
-    // Pending Invoices
-    const pendingInvoices = await Invoice.countDocuments({ 
-      ...matchQuery, 
-      invoiceStatus: "pending" 
-    });
-
-    // Approved Invoices
-    const approvedInvoices = await Invoice.countDocuments({ 
-      ...matchQuery, 
-      invoiceStatus: "approved" 
-    });
-
-    // Total Revenue (Grand Total ka sum)
-    const revenueAggregation = await Invoice.aggregate([
-      { $match: matchQuery },
-      { $group: { _id: null, total: { $sum: "$grandTotal" } } },
+    // One aggregation computes all totals; keep recent documents hydrated to
+    // preserve defaults in responses for legacy invoices.
+    const [totals, recentInvoices] = await Promise.all([
+      Invoice.aggregate([
+        { $match: matchQuery },
+        { $group: {
+          _id: null,
+          totalInvoices: { $sum: 1 },
+          pendingInvoices: { $sum: { $cond: [{ $eq: ["$invoiceStatus", "pending"] }, 1, 0] } },
+          approvedInvoices: { $sum: { $cond: [{ $eq: ["$invoiceStatus", "approved"] }, 1, 0] } },
+          totalRevenue: { $sum: "$grandTotal" },
+        } },
+      ]),
+      Invoice.find(matchQuery).sort({ createdAt: -1 }).limit(5),
     ]);
-    const totalRevenue = revenueAggregation[0] ? revenueAggregation[0].total : 0;
-
-    // Recent 5 Invoices (Table ke liye - Newest first)
-    const recentInvoices = await Invoice.find(matchQuery)
-      .sort({ createdAt: -1 })
-      .limit(5);
+    const { totalInvoices = 0, pendingInvoices = 0, approvedInvoices = 0, totalRevenue = 0 } = totals[0] || {};
 
     return res.status(200).json({
       success: true,

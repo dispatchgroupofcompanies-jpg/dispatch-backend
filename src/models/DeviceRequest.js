@@ -53,4 +53,8 @@ deviceRequestSchema.index({ userId: 1, deviceId: 1 }, { unique: true });
 deviceRequestSchema.index({ userId: 1, status: 1 });
 deviceRequestSchema.index({ status: 1, requestedAt: -1 });
 
+// Non-unique indexes for existing list filters and sort order.
+deviceRequestSchema.index({ requestedAt: -1 });
+deviceRequestSchema.index({ userId: 1, requestedAt: -1 });
+
 module.exports = mongoose.model("DeviceRequest", deviceRequestSchema);

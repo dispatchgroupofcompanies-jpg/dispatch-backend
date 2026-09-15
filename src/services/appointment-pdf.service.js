@@ -1,22 +1,5 @@
-const pdf = require("html-pdf-node");
+const { renderPdf } = require("./pdf/render.service");
 const { uploadPDFBufferToCloudinary } = require("./cloudinary.service");
-
-// PDF generation options (pre-configured for performance)
-const PDF_OPTIONS = {
-  format: "A4",
-  printBackground: true,
-  preferCSSPageSize: true,
-  margin: { top: 0, right: 0, bottom: 0, left: 0 },
-  launchOptions: {
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu",
-      "--single-process",
-    ],
-  },
-};
 
 const generateAppointmentPDF = async (appointment) => {
   if (!appointment || !appointment._id) {
@@ -36,7 +19,7 @@ const generateAppointmentPDF = async (appointment) => {
       throw new Error("Failed to generate appointment HTML from frontend");
     }
 
-    const pdfBuffer = await pdf.generatePdf({ content: response.data.html }, PDF_OPTIONS);
+    const pdfBuffer = await renderPdf(response.data.html);
     const cloudinaryUrl = await uploadPDFBufferToCloudinary(pdfBuffer, fileName, "appointments");
     return cloudinaryUrl;
   } catch (error) {

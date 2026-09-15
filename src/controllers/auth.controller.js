@@ -4,12 +4,7 @@ const DeviceRequest = require("../models/DeviceRequest");
 const bcrypt = require("bcryptjs");
 const { getJwtSecret } = require("../config/env");
 
-const cookieOptions = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax",
-  maxAge: 7 * 24 * 60 * 60 * 1000,
-};
+const { cookieOptions, clearCookieOptions } = require("../config/auth");
 
 exports.login = async (req, res) => {
   try {
@@ -67,7 +62,6 @@ exports.login = async (req, res) => {
     return res.json({
       success: true,
       message: "Login successful.",
-      token,
       user: account,
       ...(user.role === "admin" ? { admin: account } : {}),
     });
@@ -78,6 +72,19 @@ exports.login = async (req, res) => {
 };
 
 exports.logout = (req, res) => {
-  res.clearCookie("token", cookieOptions);
+  res.clearCookie("token", clearCookieOptions);
   return res.json({ success: true, message: "Logout successful." });
+};
+
+exports.me = (req, res) => {
+  const account = req.user;
+  return res.json({
+    success: true,
+    user: {
+      id: account._id,
+      name: account.name,
+      email: account.email,
+      role: req.accountType === "admin" ? "admin" : account.role || "user",
+    },
+  });
 };

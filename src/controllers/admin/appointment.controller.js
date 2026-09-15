@@ -48,37 +48,26 @@ exports.getAppointments = async (req, res) => {
       filter.userId = userId;
     }
 
-    const totalAppointments = await Appointment.countDocuments(filter);
-    const appointments = await Appointment.find(filter)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
-
-    // Populate user information for each appointment
-    const appointmentsWithUserInfo = await Promise.all(
-      appointments.map(async (appointment) => {
-        if (appointment.userId) {
-          try {
-            const User = require("../../models/user.model");
-            const user = await User.findById(appointment.userId).select("name email");
-            return {
-              ...appointment.toObject(),
-              createdByUser: user ? { name: user.name, email: user.email } : null
-            };
-          } catch (error) {
-            console.error("Error fetching user for appointment:", error);
-            return {
-              ...appointment.toObject(),
-              createdByUser: null
-            };
-          }
-        }
-        return {
-          ...appointment.toObject(),
-          createdByUser: null
-        };
-      })
-    );
+    const [totalAppointments, appointments] = await Promise.all([
+      Appointment.countDocuments(filter),
+      Appointment.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+    ]);
+    // Batch creators without replacing the userId field in the API response.
+    const userIds = [...new Set(appointments.filter((item) => item.userId).map((item) => String(item.userId)))];
+    let usersById = new Map();
+    if (userIds.length) {
+      try {
+        const User = require("../../models/user.model");
+        const users = await User.find({ _id: { $in: userIds } }).select("name email").lean();
+        usersById = new Map(users.map((user) => [String(user._id), user]));
+      } catch (error) {
+        console.error("Error fetching users for appointments:", error);
+      }
+    }
+    const appointmentsWithUserInfo = appointments.map((appointment) => {
+      const user = usersById.get(String(appointment.userId));
+      return { ...appointment.toObject(), createdByUser: user ? { name: user.name, email: user.email } : null };
+    });
 
     return res.json({
       success: true,
