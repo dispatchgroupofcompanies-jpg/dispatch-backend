@@ -7,14 +7,33 @@ const loadBoardSchema = new mongoose.Schema(
       required: [true, "Carrier name is required"],
       trim: true,
     },
+    companyName: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     thirdPartyCarrierName: {
       type: String,
       required: [true, "3P Carrier name is required"],
       trim: true,
     },
+    address: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    postalCode: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     date: {
       type: Date,
       required: [true, "Date is required"],
+    },
+    loadDate: {
+      type: Date,
+      default: null,
     },
     mgCharges: {
       type: Number,

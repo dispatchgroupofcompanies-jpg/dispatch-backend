@@ -3,9 +3,20 @@ const { uploadImageBufferToCloudinary, cloudinary } = require("../../services/cl
 
 const parseRecordBody = (body) => {
   const parsed = { ...body };
+  if (!parsed.thirdPartyCarrierName) {
+    parsed.thirdPartyCarrierName = parsed.carrierName || parsed.companyName || "";
+  }
+
   ["mgCharges", "tripCharges", "dispatchCharges", "legs"].forEach((field) => {
     if (parsed[field] !== undefined && parsed[field] !== "") parsed[field] = Number(parsed[field]);
   });
+
+  if (parsed.loadDate && typeof parsed.loadDate === "string") {
+    parsed.loadDate = new Date(parsed.loadDate);
+  }
+  if (parsed.date && typeof parsed.date === "string") {
+    parsed.date = new Date(parsed.date);
+  }
   if (typeof parsed.loads === "string") parsed.loads = JSON.parse(parsed.loads);
   return parsed;
 };
@@ -125,6 +136,9 @@ exports.createLoadBoardRecord = async (req, res) => {
     if (recordData.date && typeof recordData.date === 'string') {
       recordData.date = new Date(recordData.date);
     }
+    if (recordData.loadDate && typeof recordData.loadDate === 'string') {
+      recordData.loadDate = new Date(recordData.loadDate);
+    }
 
     // Ensure legs is at least 1
     if (!recordData.legs || recordData.legs < 1) {
@@ -193,6 +207,9 @@ exports.updateLoadBoardRecord = async (req, res) => {
     updateData = await attachScreenshot(updateData, req.file, existingRecord.screenshotPublicId);
     if (updateData.date && typeof updateData.date === 'string') {
       updateData.date = new Date(updateData.date);
+    }
+    if (updateData.loadDate && typeof updateData.loadDate === 'string') {
+      updateData.loadDate = new Date(updateData.loadDate);
     }
 
     // Ensure legs is at least 1
