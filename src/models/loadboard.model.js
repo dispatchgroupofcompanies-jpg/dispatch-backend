@@ -27,6 +27,12 @@ const loadBoardSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    eTransfer: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: "",
+    },
     date: {
       type: Date,
       required: [true, "Date is required"],
