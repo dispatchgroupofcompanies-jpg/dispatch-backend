@@ -20,6 +20,8 @@ const { requireAdmin } = require("../../middleware/authorize.middleware");
 const { validateRequest, validateObjectId } = require("../../middleware/validation.middleware");
 const Invoice = require("../../models/invoice.model");
 const mongoose = require("mongoose");
+const { searchInvoices } = require("../../services/invoiceSearch.service");
+const { exactVrid } = require("../../services/invoiceVrid.service");
 
 // Payment proof images are kept in memory and streamed to Cloudinary.
 const paymentProofUpload = multer({
@@ -44,6 +46,18 @@ router.use(requireAdmin);
 // GET /api/admin/invoices - List all invoices
 router.get("/", getAllInvoices);
 
+// Search the complete collection before applying pagination; admin middleware above scopes access.
+router.get("/search", async (req, res) => {
+  try {
+    return res.json(await searchInvoices(req.query));
+  } catch (error) {
+    return res.status(error.status || 500).json({
+      success: false,
+      message: error.status ? error.message : "Unable to search invoices. Please retry.",
+    });
+  }
+});
+
 // GET /api/admin/invoices/check-vrid - Check if VRID exists
 router.get("/check-vrid", async (req, res) => {
   try {
@@ -60,8 +74,7 @@ router.get("/check-vrid", async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid invoice ID." });
     }
 
-    const escapedVrid = vrid.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const vridRegex = new RegExp(`^${escapedVrid}$`, "i");
+    const vridRegex = exactVrid(vrid);
     const query = {
       "trips.vrid": vridRegex,
       ...(excludeInvoiceId ? { _id: { $ne: excludeInvoiceId } } : {}),

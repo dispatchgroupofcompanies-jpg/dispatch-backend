@@ -11,27 +11,7 @@ const { uploadImageBufferToCloudinary, cloudinary } = require("../../services/cl
 const { buildInvoiceFilename } = require("../../utils/filename.utils");
 const calculateInvoice = require("../../services/invoiceCalculation.service");
 
-// Helper: Handles MongoDB E11000 duplicate serial errors gracefully via auto-retry
-const createInvoiceWithUniqueNumber = async (payload, maxRetries = 3) => {
-  let attempt = 0;
-
-  while (true) {
-    try {
-      return await Invoice.create(payload);
-    } catch (err) {
-      const isDuplicateInvoiceNumber = err.code === 11000 && err.keyPattern?.invoiceNumber;
-      if (isDuplicateInvoiceNumber && attempt < maxRetries) {
-        attempt += 1;
-        const newNumber = await generateInvoiceNumber(payload.payee);
-        payload.invoiceNumber = newNumber.invoiceNumber;
-        payload.payeeKey = newNumber.payeeKey;
-        payload.payeeSerialNumber = newNumber.serialNumber;
-        continue;
-      }
-      throw err;
-    }
-  }
-};
+const { validateVrids, assertVridsAvailable, withInvoiceWrite } = require("../../services/invoiceVrid.service");
 
 // Admin: Create new invoice directly
 exports.createInvoice = async (req, res) => {
@@ -43,6 +23,8 @@ exports.createInvoice = async (req, res) => {
         message: "At least one trip is required to compile an invoice.",
       });
     }
+
+    validateVrids(data.trips);
 
     // Run core calculations on provided trips
     const calculated = calculateInvoice(data.trips);
@@ -64,28 +46,33 @@ exports.createInvoice = async (req, res) => {
       };
     });
 
-    const generatedNumber = await generateInvoiceNumber(data.payee);
-    const invoicePayload = {
-      ...data,
-      invoiceNumber: generatedNumber.invoiceNumber,
-      payeeKey: generatedNumber.payeeKey,
-      payeeSerialNumber: generatedNumber.serialNumber,
-      trips: finalizedTrips,
-      subtotal: calculated.subtotal,
-      tax: calculated.tax,
-      grandTotal: calculated.grandTotal,
-      invoiceDate: data.invoiceDate ? new Date(data.invoiceDate) : new Date(),
-      createdBy: req.user?._id || null,
-    };
-
-    if (Array.isArray(data.invoicePeriod) && data.invoicePeriod.length === 2) {
-      invoicePayload.invoicePeriod = {
-        startDate: new Date(data.invoicePeriod[0]),
-        endDate: new Date(data.invoicePeriod[1]),
+    const invoice = await withInvoiceWrite(async (session) => {
+      await assertVridsAvailable(finalizedTrips, null, session);
+      const generatedNumber = await generateInvoiceNumber(data.payee);
+      const invoicePayload = {
+        ...data,
+        invoiceNumber: generatedNumber.invoiceNumber,
+        payeeKey: generatedNumber.payeeKey,
+        payeeSerialNumber: generatedNumber.serialNumber,
+        trips: finalizedTrips,
+        subtotal: calculated.subtotal,
+        tax: calculated.tax,
+        grandTotal: calculated.grandTotal,
+        invoiceDate: data.invoiceDate ? new Date(data.invoiceDate) : new Date(),
+        createdBy: req.user?._id || null,
       };
-    }
 
-    const invoice = await createInvoiceWithUniqueNumber(invoicePayload);
+      if (Array.isArray(data.invoicePeriod) && data.invoicePeriod.length === 2) {
+        invoicePayload.invoicePeriod = {
+          startDate: new Date(data.invoicePeriod[0]),
+          endDate: new Date(data.invoicePeriod[1]),
+        };
+      }
+
+      const [createdInvoice] = await Invoice.create([invoicePayload], { session });
+      return createdInvoice;
+    });
+    invoice.$session(null);
 
     // Initial PDF generation step
     try {
@@ -102,6 +89,7 @@ exports.createInvoice = async (req, res) => {
     });
   } catch (error) {
     console.error("🔥 ERROR CREATING INVOICE (ADMIN):", error);
+    if (error.status) return res.status(error.status).json({ success: false, message: error.message });
     if (error.name === "ValidationError") {
       return res.status(400).json({
         success: false,
@@ -211,55 +199,63 @@ exports.getInvoiceById = async (req, res) => {
 // Admin: Update invoice details and recalculate totals
 exports.updateInvoice = async (req, res) => {
   try {
-    const invoice = await Invoice.findById(req.params.id);
-    if (!invoice) {
-      return res.status(404).json({ success: false, message: "Invoice not found." });
-    }
+    const invoice = await withInvoiceWrite(async (session) => {
+      const invoice = await Invoice.findById(req.params.id).session(session);
+      if (!invoice) {
+        throw Object.assign(new Error("Invoice not found."), { status: 404 });
+      }
+      // Validate submitted trips, allowing this invoice to retain its own VRIDs.
+      if (req.body.trips !== undefined) {
+        await assertVridsAvailable(req.body.trips, invoice._id, session);
+      }
 
-    const {
-      invoiceNumber,
-      payeeKey,
-      payeeSerialNumber,
-      createdBy,
-      pdfUrl,
-      paymentStatus,
-      paymentProofUrl,
-      paymentProofPublicId,
-      paidAt,
-      shareToken,
-      shareExpiresAt,
-      emailStatus,
-      emailSentAt,
-      subtotal,
-      tax,
-      grandTotal,
-      payee,
-      trips,
-      invoicePeriod,
-      ...updates
-    } = req.body;
-    Object.assign(invoice, updates);
+      const {
+        invoiceNumber,
+        payeeKey,
+        payeeSerialNumber,
+        createdBy,
+        pdfUrl,
+        paymentStatus,
+        paymentProofUrl,
+        paymentProofPublicId,
+        paidAt,
+        shareToken,
+        shareExpiresAt,
+        emailStatus,
+        emailSentAt,
+        subtotal,
+        tax,
+        grandTotal,
+        payee,
+        trips,
+        invoicePeriod,
+        ...updates
+      } = req.body;
+      Object.assign(invoice, updates);
 
-    if (payee) {
-      invoice.payee = { ...(invoice.payee?.toObject?.() || {}), ...payee };
-    }
+      if (payee) {
+        invoice.payee = { ...(invoice.payee?.toObject?.() || {}), ...payee };
+      }
 
-    if (Array.isArray(invoicePeriod) && invoicePeriod.length === 2) {
-      invoice.invoicePeriod = {
-        startDate: new Date(invoicePeriod[0]),
-        endDate: new Date(invoicePeriod[1]),
-      };
-    }
+      if (Array.isArray(invoicePeriod) && invoicePeriod.length === 2) {
+        invoice.invoicePeriod = {
+          startDate: new Date(invoicePeriod[0]),
+          endDate: new Date(invoicePeriod[1]),
+        };
+      }
 
-    if (trips) {
-      const result = calculateInvoice(trips);
-      invoice.trips = result.trips;
-      invoice.subtotal = result.subtotal;
-      invoice.tax = result.tax;
-      invoice.grandTotal = result.grandTotal;
-    }
+      if (trips) {
+        const result = calculateInvoice(trips);
+        invoice.trips = result.trips;
+        invoice.subtotal = result.subtotal;
+        invoice.tax = result.tax;
+        invoice.grandTotal = result.grandTotal;
+      }
 
-    await invoice.save();
+      await invoice.save({ session });
+      return invoice;
+    });
+    invoice.$session(null);
 
     // Re-render PDF to keep document visually in sync
     try {
@@ -276,6 +272,7 @@ exports.updateInvoice = async (req, res) => {
     });
   } catch (error) {
     console.error("Error updating invoice:", error);
+    if (error.status) return res.status(error.status).json({ success: false, message: error.message });
     return res.status(500).json({ success: false, message: error.message });
   }
 };
